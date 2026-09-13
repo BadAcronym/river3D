@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [[ -f "./vendor/imgsurf/clean" ]]
+then
+    pushd "./vendor/imgsurf/" > /dev/null
+    ./clean
+    popd > /dev/null
+fi
+
+if [[ -f "./vendor/vertstream/clean" ]]
+then
+    pushd "./vendor/vertstream/" > /dev/null
+    ./clean
+    popd > /dev/null
+fi
+
+echo -e "\033[33mcleaning up river3D builds...\033[0m"
+
+if [[ -d ./bin/ ]]
+then
+    rm ./bin/ -rf
+fi
+
+if [[ -f ./a.out ]]
+then
+    rm ./a.out
+fi
+
+for file in *.o
+do
+    if [[ ! -f $file ]]
+    then
+        continue;
+    fi
+
+    rm $file
+done
+
+echo -e "\033[32mcleaned river3D!\n\033[0m"
