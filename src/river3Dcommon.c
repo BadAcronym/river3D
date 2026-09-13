@@ -1,44 +1,12 @@
 #include "river3D_main.h"
+#include "pd_print_macros.h"
 
 #include "vulkan/vulkan_core.h"
-
-const char* logLevelStamps[5] =
-{
-    "[RIV_TRACE]: ",
-    "[RIV_DEBUG]: ",
-    "[RIV_WARNI]: ",
-    "[RIV_ERROR]: ",
-    "[RIV_ASSER]: "
-};
-
-const char* logLevelANSI[6] =
-{
-    "\033[30;1;1m",
-    "\033[37;1;1m",
-    "\033[33;1;1m",
-    "\033[31;1;1m",
-    "\033[31;1;7m",
-    "\033[35;1;7m"
-};
-
-const char* clearANSI = "\033[0m";
-
-RiverLogLevel severityTranslation(VkDebugUtilsMessageSeverityFlagBitsEXT severity)
-{
-    switch(severity)
-    {
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:   return RIV_LOG_LEVEL_TRACE;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:      return RIV_LOG_LEVEL_DEBUG;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:   return RIV_LOG_LEVEL_WARN;
-        case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:     return RIV_LOG_LEVEL_ERROR;
-        default:                                                return RIV_LOG_LEVEL_UNDEFINED;
-    }
-}
 
 #ifdef DEBUG
 internal const char* riverTranslateVkResult
 (
-    const VkResult &code
+    const VkResult code
 ){
     switch(code)
     {
@@ -103,11 +71,8 @@ internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
     void                                        *userData
 ){
     //can I know which layer is outputting the msg?
-    riverLog(std::format("VL says: {} {} {}",
-                         callbackData->pMessage,
-                         messageType,
-                         userData),
-             severityTranslation(messageSeverity));
+    PD_DEBUG("VL says: %s with messageType 0x%X.",
+             callbackData->pMessage, messageType);
 
     return VK_FALSE;
 }
@@ -120,7 +85,7 @@ internal VkResult CreateDebugUtilsMessengerEXT
     VkDebugUtilsMessengerEXT                    *debugMessenger
 ){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-    if(nullptr != func)
+    if(func)
     {
         return func(instance, createInfo, allocator, debugMessenger);
     }
