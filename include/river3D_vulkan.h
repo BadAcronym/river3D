@@ -1,20 +1,5 @@
 #pramga once
 
-typedef struct SwapchainSupportDetails
-{
-    VkSurfaceCapabilitiesKHR capabilities;
-    // std::vector<VkSurfaceFormatKHR> formats;
-    // std::vector<VkPresentModeKHR> presentModes;
-}
-SwapchainSupportDetails;
-
-struct QueueFamilyIndices
-{
-    uint32_t graphicsIndex; // = UINT32_MAX;
-    uint32_t transferIndex; // = UINT32_MAX;
-    uint32_t presentIndex;  // = UINT32_MAX;
-};
-
 extern void createSurface
 (
     EngineData *engine
