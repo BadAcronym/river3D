@@ -4,6 +4,9 @@ BuildRules*
 build/
 bin/
 obj/
+*.o
+*.obj
+a.out
 
 compile_flags*
 compile_commands*
