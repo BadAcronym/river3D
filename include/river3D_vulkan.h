@@ -112,8 +112,7 @@ extern VkImageView createImageView
 
 extern void createTextureImage
 (
-    EngineData            *engine,
-    const ProjectManifest *manifest
+    EngineData *engine
 );
 
 extern void createTextureSampler
@@ -133,8 +132,7 @@ extern void transitionImageLayout
 
 extern void createGraphicsPipeline
 (
-    EngineData            *engine,
-    const ProjectManifest *manifest
+    EngineData *engine,
 );
 
 extern void createFramebuffers

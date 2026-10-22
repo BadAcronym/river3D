@@ -1,55 +1,80 @@
 #include "river3D_main.h"
+#include "rv_print_macros.h"
 
 #include "vulkan/vulkan_core.h"
 
-const char *deviceExtensions[1] =
+#define DEVICE_EXTENSION_COUNT 1
+
+const char *requiredExtensions[DEVICE_EXTENSION_COUNT] =
 {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-internal VkBool32 checkDeviceExtensionSupport(VkPhysicalDevice device)
-{
-    uint32_t extensionCount;
+f_internal VkBool32 checkDeviceExtensionSupport
+(
+    VkPhysicalDevice device
+){
+    u32 availExtensionCount = 0;
 
-    vkEnumerateDeviceExtensionProperties(device, 0, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, 0, &extensionCount, availableExtensions.data());
+    vkEnumerateDeviceExtensionProperties(device, 0, &availExtensionCount, 0);
+    VkExtensionProperties availableExtensions[availExtensionCount];
+    vkEnumerateDeviceExtensionProperties(device, 0, &availExtensionCount,
+                                         availableExtensions);
 
-    // StringView requiredExtensions = (deviceExtensions.begin(), deviceExtensions.end());
-
-    for(const auto &extension : availableExtensions)
+    for(u16 i = 0; i < DEVICE_EXTENSION_COUNT; ++i)
     {
-        requiredExtensions.erase(extension.extensionName);
+        StringView required = pdCstrSV(requiredExtensions[i]);
+
+        for(u16 j = 0; j < availExtensionCount; ++j)
+        {
+            StringView avail = pdCstrSV(availableExtensions[j].extensionName);
+            if(pdSVSame(required, avail))
+            {
+                goto found;
+            }
+        }
+        RV_ERROR("unable to find extension: '"PRI_SV"'.", ARG_SV(required));
+        goto notfound;
+
+    found:
+        continue;
     }
 
-    return requiredExtensions.empty();
+    return VK_SUCCESS;
+
+notfound:
+    return VK_ERROR_EXTENSION_NOT_PRESENT;
 }
 
-QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device, const VkSurfaceKHR &surface)
-{
-    QueueFamilyIndices indices{};
-    uint32_t queueFamilyCount = 0;
+QueueFamilyIndices findQueueFamilies
+(
+    const VkPhysicalDevice *device,
+    const VkSurfaceKHR     *surface
+){
+    QueueFamilyIndices indices = {0};
+    u32 queueFamilyCount = 0;
 
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, 0);
+    vkGetPhysicalDeviceQueueFamilyProperties(*device, &queueFamilyCount, 0);
 
-    std::vector<VkQueueFamilyProperties> physicalQueueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, physicalQueueFamilies.data());
+    VkQueueFamilyProperties physicalQueueFamilies[queueFamilyCount];
+    vkGetPhysicalDeviceQueueFamilyProperties(*device, &queueFamilyCount, physicalQueueFamilies);
 
     VkBool32 presentSupport = false;
 
-    for(int i = 0; const auto &queueFamily : physicalQueueFamilies)
+    for(u32 i = 0; i < queueFamilyCount; ++i)
     {
-        if(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if(physicalQueueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             indices.graphicsIndex = i;
         }
 
-        if(queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT && i != indices.graphicsIndex)
-        {
+        if(physicalQueueFamilies[i].queueFlags & VK_QUEUE_TRANSFER_BIT &&
+           i != indices.graphicsIndex
+        ){
             indices.transferIndex = i;
         }
 
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+        vkGetPhysicalDeviceSurfaceSupportKHR(*device, i, *surface, &presentSupport);
         if(presentSupport)
         {
             indices.presentIndex = i;
@@ -57,11 +82,10 @@ QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device, const VkSur
 
         if( indices.graphicsIndex != UINT32_MAX &&
             indices.transferIndex != UINT32_MAX &&
-            indices.presentIndex != UINT32_MAX
+            indices.presentIndex  != UINT32_MAX
         ){
             break;
         }
-        ++i;
     }
 
     if(indices.transferIndex == UINT32_MAX)
@@ -72,26 +96,26 @@ QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice &device, const VkSur
     return indices;
 }
 
-internal uint32_t rateDeviceSuitability
+f_internal u32 rateDeviceSuitability
 (
-    const EngineData        &engine,
-    const VkPhysicalDevice  &device
+    const EngineData       *engine,
+    const VkPhysicalDevice *device
 ){
-    uint32_t score = 0;
-    QueueFamilyIndices indices = findQueueFamilies(device, engine.surface);
+    u32 score = 0;
+    QueueFamilyIndices indices = findQueueFamilies(device, engine->surface);
 
     if( indices.graphicsIndex == UINT32_MAX ||
         indices.transferIndex == UINT32_MAX ||
-        indices.presentIndex == UINT32_MAX
+        indices.presentIndex  == UINT32_MAX
     ){
         return 0;
     }
 
-    VkPhysicalDeviceProperties toRateDeviceProperties{};
-    vkGetPhysicalDeviceProperties(device, &toRateDeviceProperties);
+    VkPhysicalDeviceProperties toRateDeviceProperties = {0};
+    vkGetPhysicalDeviceProperties(*device, &toRateDeviceProperties);
 
-    VkPhysicalDeviceFeatures toRateDeviceFeatures{};
-    vkGetPhysicalDeviceFeatures(device, &toRateDeviceFeatures);
+    VkPhysicalDeviceFeatures toRateDeviceFeatures = {0};
+    vkGetPhysicalDeviceFeatures(*device, &toRateDeviceFeatures);
 
     if(!toRateDeviceFeatures.samplerAnisotropy ||
        !toRateDeviceFeatures.geometryShader)
@@ -99,7 +123,7 @@ internal uint32_t rateDeviceSuitability
         return 0;
     }
 
-    bool extensionsSupported = checkDeviceExtensionSupport(device);
+    bool extensionsSupported = checkDeviceExtensionSupport(*device);
     if(!extensionsSupported)
     {
         return 0;
@@ -136,12 +160,12 @@ internal uint32_t rateDeviceSuitability
 
 SwapchainSupportDetails querySwapchainSupport
 (
-    const VkPhysicalDevice  &physicalDevice,
-    const VkSurfaceKHR      &surface
+    const VkPhysicalDevice *physicalDevice,
+    const VkSurfaceKHR     *surface
 ){
-    SwapchainSupportDetails details;
-    uint32_t formatCount;
-    uint32_t presentModeCount;
+    SwapchainSupportDetails details = {0};
+    u32                formatCount = 0;
+    u32                presentModeCount = 0;
 
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.capabilities);
     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, 0);
@@ -172,7 +196,7 @@ void pickPhysicalDevice
 (
     EngineData &engine
 ){
-    uint32_t deviceCount = 0;
+    u32 deviceCount = 0;
 
     vkEnumeratePhysicalDevices(engine.instance, &deviceCount, 0);
     if(0 == deviceCount)
@@ -181,13 +205,13 @@ void pickPhysicalDevice
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    std::multimap<uint32_t, VkPhysicalDevice> suitabilityCandidates;
+    std::multimap<u32, VkPhysicalDevice> suitabilityCandidates;
 
     vkEnumeratePhysicalDevices(engine.instance, &deviceCount, devices.data());
 
     for(const auto& device : devices)
     {
-        uint32_t score = rateDeviceSuitability(engine, device);
+        u32 score = rateDeviceSuitability(engine, device);
         suitabilityCandidates.insert(std::make_pair(score, device));
     }
 
@@ -203,17 +227,17 @@ void pickPhysicalDevice
 
 void createLogicalDevice
 (
-    EngineData &engine
+    EngineData *engine
 ){
     QueueFamilyIndices indices = findQueueFamilies(engine.physicalDevice, engine.surface);
     engine.logicalQueueFamilies.graphicsIndex = indices.graphicsIndex;
     engine.logicalQueueFamilies.transferIndex = indices.transferIndex;
-    engine.logicalQueueFamilies.presentIndex = indices.presentIndex;
+    engine.logicalQueueFamilies.presentIndex  = indices.presentIndex;
 
     engine.msaaSamples = getMaxMSAASamples(engine);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies =
+    std::set<u32> uniqueQueueFamilies =
     {
         engine.logicalQueueFamilies.graphicsIndex,
         engine.logicalQueueFamilies.transferIndex,
@@ -221,44 +245,49 @@ void createLogicalDevice
     };
 
     float queuePriority = 1.0f;
-    for(uint32_t queueFamily : uniqueQueueFamilies)
+    for(u32 queueFamily : uniqueQueueFamilies)
     {
-        VkDeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        VkDeviceQueueCreateInfo queueCreateInfo = {0};
+        queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.queueCount       = 1;
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.emplace_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
+    VkPhysicalDeviceFeatures deviceFeatures = {0};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
 
-    VkDeviceCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-    createInfo.pEnabledFeatures = &deviceFeatures;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+    VkDeviceCreateInfo createInfo = {0};
+    createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pQueueCreateInfos       = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount    = queueCreateInfos.size();
+    createInfo.pEnabledFeatures        = &deviceFeatures;
+    createInfo.enabledExtensionCount   = deviceExtensions.size();
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
     #ifdef DEBUG
-        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.enabledLayerCount   = alidationLayers.size();
         createInfo.ppEnabledLayerNames = validationLayers.data();
     #else
         createInfo.enabledLayerCount = 0;
     #endif
 
-    VkResult result = vkCreateDevice(engine.physicalDevice, &createInfo, 0, &engine.logicalDevice);
+    VkResult result = vkCreateDevice(engine.physicalDevice, &createInfo, 0,
+                                     &engine.logicalDevice);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create logical device.");
 
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.graphicsIndex, 0, &engine.graphicsQueue);
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.transferIndex, 0, &engine.transferQueue);
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.presentIndex, 0, &engine.presentQueue);
+    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.graphicsIndex, 0,
+                     &engine.graphicsQueue);
+    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.transferIndex, 0,
+                     &engine.transferQueue);
+    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.presentIndex, 0,
+                     &engine.presentQueue);
 
     vkGetPhysicalDeviceProperties(engine.physicalDevice, &engine.deviceProperties);
     vkGetPhysicalDeviceFeatures(engine.physicalDevice, &deviceFeatures);
-    vkGetPhysicalDeviceMemoryProperties(engine.physicalDevice, &engine.deviceMemoryProperties);
+    vkGetPhysicalDeviceMemoryProperties(engine.physicalDevice,
+                                        &engine.deviceMemoryProperties);
 }
 
 VkSampleCountFlagBits getMaxMSAASamples

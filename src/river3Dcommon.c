@@ -1,10 +1,10 @@
 #include "river3D_main.h"
-#include "pd_print_macros.h"
+#include "rv_print_macros.h"
 
 #include "vulkan/vulkan_core.h"
 
 #ifdef DEBUG
-internal const char* riverTranslateVkResult
+f_internal const char* riverTranslateVkResult
 (
     const VkResult code
 ){
@@ -63,7 +63,7 @@ internal const char* riverTranslateVkResult
     }
 }
 
-internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
+f_internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
 (
     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT             messageType,
@@ -71,18 +71,18 @@ internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
     void                                        *userData
 ){
     //can I know which layer is outputting the msg?
-    PD_DEBUG("VL says: %s with messageType 0x%X.",
+    RV_DEBUG("VL says: %s with messageType 0x%X.",
              callbackData->pMessage, messageType);
 
     return VK_FALSE;
 }
 
-internal VkResult CreateDebugUtilsMessengerEXT
+f_internal VkResult CreateDebugUtilsMessengerEXT
 (
-    VkInstance                                  instance,
-    const VkDebugUtilsMessengerCreateInfoEXT    *createInfo,
-    const VkAllocationCallbacks                 *allocator,
-    VkDebugUtilsMessengerEXT                    *debugMessenger
+    VkInstance                               instance,
+    const VkDebugUtilsMessengerCreateInfoEXT *createInfo,
+    const VkAllocationCallbacks              *allocator,
+    VkDebugUtilsMessengerEXT                 *debugMessenger
 ){
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if(func)
@@ -95,15 +95,15 @@ internal VkResult CreateDebugUtilsMessengerEXT
     }
 }
 
-internal VkBool32 checkValidationLayerSupport
+f_internal VkBool32 checkValidationLayerSupport
 (
     void
 ){
-    uint32_t layerCount = 0;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    u32 layerCount = 0;
+    vkEnumerateInstanceLayerProperties(&layerCount, 0);
 
-    std::vector<VkLayerProperties> layerVec(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, layerVec.data());
+    VkLayerProperties layers[layerCount];
+    vkEnumerateInstanceLayerProperties(&layerCount, layers);
 
     for(const char *layer : validationLayers)
     {
@@ -131,7 +131,7 @@ internal VkBool32 checkValidationLayerSupport
     return VK_TRUE;
 }
 
-internal void populateDebugMessengerCreateInfo
+f_internal void populateDebugMessengerCreateInfo
 (
     VkDebugUtilsMessengerCreateInfoEXT *createInfo
 ){
@@ -146,35 +146,38 @@ internal void populateDebugMessengerCreateInfo
     createInfo.pfnUserCallback = debugCallback;
 }
 
-internal void setupDebugMessenger
+f_internal void setupDebugMessenger
 (
-    EngineData &engine
+    EngineData *engine
 ){
 
-    VkDebugUtilsMessengerCreateInfoEXT createInfo{};
-    populateDebugMessengerCreateInfo(createInfo);
+    VkDebugUtilsMessengerCreateInfoEXT createInfo = {0};
+    populateDebugMessengerCreateInfo(&createInfo);
 
-    VkResult result = CreateDebugUtilsMessengerEXT(engine.instance, &createInfo, nullptr, &engine.debugMessenger);
+    VkResult result = CreateDebugUtilsMessengerEXT(engine->instance, &createInfo, 0, &engine.debugMessenger);
     RIV_ASSERT_VK_SUCCESS(result, "failed to set up debug messenger.");
 }
 
-internal void DestroyDebugUtilsMessengerEXT
+f_internal void DestroyDebugUtilsMessengerEXT
 (
-    const EngineData            &engine,
+    const EngineData            *engine,
     const VkAllocationCallbacks *allocator
 ){
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(engine.instance,
                                                                            "vkDestroyDebugUtilsMessengerEXT");
-    if(nullptr != func)
+    if(func)
     {
         func(engine.instance, engine.debugMessenger, allocator);
     }
 }
 #endif
 
-internal std::vector<const char*> getRequiredExtensions()
-{
-    uint32_t glfwExtensionCount = 0;
+f_internal StringView* getRequiredExtensions
+(
+    void
+){
+    // NOTE: need a replacement for GLFW here D:
+    u32 glfwExtensionCount = 0;
     const char** glfwExtensions;
 
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -187,7 +190,7 @@ internal std::vector<const char*> getRequiredExtensions()
     return extensions;
 }
 
-internal VkBool32 checkInstanceExtensions
+f_internal VkBool32 checkInstanceExtensions
 (
     StringView            *requiredExt,
     VkExtensionProperties *instanceExt
@@ -217,54 +220,54 @@ internal VkBool32 checkInstanceExtensions
     return VK_TRUE;
 }
 
-internal void createInstance
+f_internal void createInstance
 (
-    EngineData              &engine,
-    const ProjectManifest   &manifest
+    EngineData *engine
 ){
     #ifdef DEBUG
         RIV_ASSERT(checkValidationLayerSupport(), "validation layers requested, but not available!");
     #endif
 
-    VkApplicationInfo appInfo{};
+    VkApplicationInfo appInfo = {0};
     appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName   = manifest.projectName;
+    appInfo.pApplicationName   = engine->projectName;
     appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 1);
     appInfo.pEngineName        = ENGINE_NAME;
     appInfo.engineVersion      = VK_MAKE_API_VERSION(0, 0, 0, 1);
     appInfo.apiVersion         = VK_API_VERSION_1_0;
 
-    uint32_t instanceExtensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, nullptr);
-    std::vector<VkExtensionProperties> instanceExtensions(instanceExtensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &instanceExtensionCount, instanceExtensions.data());
+    u32 instanceExtensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(0, &instanceExtensionCount, 0);
+    VkExtensionProperties instanceExtensions[instanceExtensionCount];
+    vkEnumerateInstanceExtensionProperties(0, &instanceExtensionCount,
+                                           instanceExtensions);
 
-    std::vector<const char*> requiredExtensions = getRequiredExtensions();
+    StringView *requiredExtensions = getRequiredExtensions();
 
-    bool resultBool = checkInstanceExtensions(&requiredExtensions, &instanceExtensions);
-    RIV_ASSERT(resultBool, "extensions required, but not available!");
+    bool extOK = checkInstanceExtensions(&requiredExtensions, &instanceExtensions);
+    RV_ASSERT(extOK, "extensions required, but not available!");
 
-    VkInstanceCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size());
-    createInfo.ppEnabledExtensionNames = requiredExtensions.data();
-    createInfo.enabledLayerCount = 0;
+    VkInstanceCreateInfo createInfo = {0};
+    createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pApplicationInfo        = &appInfo;
+    createInfo.enabledExtensionCount   = requiredExtensions.size();
+    createInfo.ppEnabledExtensionNames = requiredExtensions;
+    createInfo.enabledLayerCount       = 0;
 
     #ifdef DEBUG
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
-        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-        createInfo.ppEnabledLayerNames = validationLayers.data();
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {0};
+        createInfo.enabledLayerCount   = validationLayers.size();
+        createInfo.ppEnabledLayerNames = validationLayers;
 
         populateDebugMessengerCreateInfo(debugCreateInfo);
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
     #else
         createInfo.enabledLayerCount = 0;
-        createInfo.pNext = nullptr;
+        createInfo.pNext = 0;
     #endif
 
-    VkResult result = vkCreateInstance(&createInfo, nullptr, &engine.instance);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create instance.");
+    VkResult result = vkCreateInstance(&createInfo, 0, &engine.instance);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create instance.");
 }
 
 void vkInit
@@ -316,39 +319,39 @@ void vkShutdown
     cleanupSyncObjects(engine);
     cleanupSwapchain(engine);
 
-    vkDestroySampler(engine.logicalDevice, engine.textureSampler, nullptr);
+    vkDestroySampler(engine.logicalDevice, engine.textureSampler, 0);
 
-    vkDestroyImage(engine.logicalDevice, engine.textureImage, nullptr);
-    vkFreeMemory(engine.logicalDevice, engine.textureImageMemory, nullptr);
-    vkDestroyImageView(engine.logicalDevice, engine.textureImageView, nullptr);
+    vkDestroyImage(engine.logicalDevice, engine.textureImage, 0);
+    vkFreeMemory(engine.logicalDevice, engine.textureImageMemory, 0);
+    vkDestroyImageView(engine.logicalDevice, engine.textureImageView, 0);
 
-    vkDestroyBuffer(engine.logicalDevice, engine.vertexBuffer, nullptr);
-    vkFreeMemory(engine.logicalDevice, engine.vertexBufferMemory, nullptr);
+    vkDestroyBuffer(engine.logicalDevice, engine.vertexBuffer, 0);
+    vkFreeMemory(engine.logicalDevice, engine.vertexBufferMemory, 0);
 
-    vkDestroyDescriptorPool(engine.logicalDevice, engine.descriptorPool, nullptr);
-    vkDestroyDescriptorSetLayout(engine.logicalDevice, engine.descriptorSetLayout, nullptr);
+    vkDestroyDescriptorPool(engine.logicalDevice, engine.descriptorPool, 0);
+    vkDestroyDescriptorSetLayout(engine.logicalDevice, engine.descriptorSetLayout, 0);
 
-    vkDestroyPipeline(engine.logicalDevice, engine.graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(engine.logicalDevice, engine.graphicsPipelineLayout, nullptr);
+    vkDestroyPipeline(engine.logicalDevice, engine.graphicsPipeline, 0);
+    vkDestroyPipelineLayout(engine.logicalDevice, engine.graphicsPipelineLayout, 0);
 
-    vkDestroyRenderPass(engine.logicalDevice, engine.renderPass, nullptr);
+    vkDestroyRenderPass(engine.logicalDevice, engine.renderPass, 0);
 
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        vkDestroyBuffer(engine.logicalDevice, engine.uniformBuffers[i], nullptr);
-        vkFreeMemory(engine.logicalDevice, engine.uniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer(engine.logicalDevice, engine.uniformBuffers[i], 0);
+        vkFreeMemory(engine.logicalDevice, engine.uniformBuffersMemory[i], 0);
     }
 
-    vkDestroyCommandPool(engine.logicalDevice, engine.graphicsCommandPool, nullptr);
-    vkDestroyCommandPool(engine.logicalDevice, engine.transferCommandPool, nullptr);
-    vkDestroyDevice(engine.logicalDevice, nullptr);
+    vkDestroyCommandPool(engine.logicalDevice, engine.graphicsCommandPool, 0);
+    vkDestroyCommandPool(engine.logicalDevice, engine.transferCommandPool, 0);
+    vkDestroyDevice(engine.logicalDevice, 0);
 
     #ifdef DEBUG
-        DestroyDebugUtilsMessengerEXT(engine, nullptr);
+        DestroyDebugUtilsMessengerEXT(engine, 0);
     #endif
 
-    vkDestroySurfaceKHR(engine.instance, engine.surface, nullptr);
-    vkDestroyInstance(engine.instance, nullptr);
+    vkDestroySurfaceKHR(engine.instance, engine.surface, 0);
+    vkDestroyInstance(engine.instance, 0);
 }
 
 void drawFrame
@@ -358,7 +361,7 @@ void drawFrame
 ){
     vkWaitForFences(engine.logicalDevice, 1, &engine.inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
-    uint32_t imageIndex;
+    u32 imageIndex;
 
     VkResult result =
         vkAcquireNextImageKHR(engine.logicalDevice,
@@ -390,28 +393,26 @@ void drawFrame
         engine.acquireSemaphore
     };
 
-    std::array<VkSemaphore, 1> signalSemaphores =
+    VkSemaphore signalSemaphores[1] =
     {
         engine.imageReadyForPresentSemaphores[imageIndex]
     };
 
-    VkPipelineStageFlags waitStages[] =
+    VkPipelineStageFlags waitStages[2] =
     {
         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
     };
 
     VkSubmitInfo drawSubmitInfo{};
-    drawSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    drawSubmitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
-    drawSubmitInfo.pWaitSemaphores = waitSemaphores.data();
-    drawSubmitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
-    drawSubmitInfo.pSignalSemaphores = signalSemaphores.data();
-
-    drawSubmitInfo.pWaitDstStageMask = waitStages;
-    drawSubmitInfo.commandBufferCount = 1;
-    drawSubmitInfo.pCommandBuffers = &engine.commandBuffers[currentFrame];
+    drawSubmitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    drawSubmitInfo.waitSemaphoreCount   = static_cast<u32>(waitSemaphores.size());
+    drawSubmitInfo.pWaitSemaphores      = waitSemaphores.data();
+    drawSubmitInfo.signalSemaphoreCount = static_cast<u32>(signalSemaphores.size());
+    drawSubmitInfo.pSignalSemaphores    = signalSemaphores.data();
+    drawSubmitInfo.pWaitDstStageMask    = waitStages;
+    drawSubmitInfo.commandBufferCount   = 1;
+    drawSubmitInfo.pCommandBuffers      = &engine.commandBuffers[currentFrame];
 
     result = vkQueueSubmit(engine.graphicsQueue, 1, &drawSubmitInfo, engine.inFlightFences[currentFrame]);
     RIV_ASSERT_VK_SUCCESS(result, "failed to submit draw command buffer!");
@@ -428,20 +429,22 @@ void drawFrame
     presentInfo.swapchainCount     = 1;
     presentInfo.pSwapchains        = swapchains;
     presentInfo.pImageIndices      = &imageIndex;
-    presentInfo.pResults           = nullptr;
+    presentInfo.pResults           = 0;
 
     std::swap(engine.imageReadyForWriteSemaphores[imageIndex], engine.acquireSemaphore);
 
     result = vkQueuePresentKHR(engine.presentQueue, &presentInfo);
 
-    if(result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || engine.framebufferResized)
-    {
+    if(result == VK_ERROR_OUT_OF_DATE_KHR ||
+       result == VK_SUBOPTIMAL_KHR        ||
+       engine.framebufferResized
+    ){
         engine.framebufferResized = VK_FALSE;
         recreateSwapchain(engine, settings);
     }
     else
     {
-        RIV_ASSERT_VK_SUCCESS(result, "failed to present swapchain image!");
+        RV_ASSERT(result == VK_SUCCESS, "failed to present swapchain image!");
     }
 
     currentFrame = (++currentFrame) % MAX_FRAMES_IN_FLIGHT;

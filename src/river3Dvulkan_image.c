@@ -1,75 +1,59 @@
 #include "river3D_main.h"
+#include "rv_print_macros.h"
+
 #include "imgsurf_main.h"
 
 #include "vulkan/vulkan_core.h"
 
-internal void copyBufferToImage
+f_internal void copyBufferToImage
 (
-    EngineData          &engine,
-    const VkBuffer      &buffer,
-    const VkImage       &image,
-    const uint32_t      &width,
-    const uint32_t      &height
+    EngineData     *engine,
+    const VkBuffer *buffer,
+    const VkImage  *image,
+    const u32      *width,
+    const u32      *height
 ){
     VkCommandBuffer commandBuffer = setupCommandBuffer(engine, engine.graphicsCommandPool);
 
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-
+    VkBufferImageCopy region = {0};
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
+    region.imageOffset                 = { 0, 0, 0 };
+    region.imageExtent                 = { width, height, 1 };
 
-    region.imageOffset =
-    {
-        0, 0, 0
-    };
-    region.imageExtent =
-    {
-        width,
-        height,
-        1
-    };
+    vkCmdCopyBufferToImage(commandBuffer, *buffer, *image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    vkCmdCopyBufferToImage(commandBuffer,
-                           buffer, image,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                           1,
-                           &region);
-
-    flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool, engine.graphicsQueue);
+    flushCommandBuffer(engine, commandBuffer, engine->graphicsCommandPool,
+                       engine->graphicsQueue);
 }
 
 void transitionImageLayout
 (
-    EngineData          &engine,
-    const VkImage       &image,
-    const uint32_t      &mipLevels,
-    const VkFormat      &format,
-    const VkImageLayout &oldLayout,
-    const VkImageLayout &newLayout
+    EngineData          *engine,
+    const VkImage       *image,
+    const u32           *mipLevels,
+    const VkFormat      *format,
+    const VkImageLayout *oldLayout,
+    const VkImageLayout *newLayout
 ){
     VkCommandBuffer commandBuffer = setupCommandBuffer(engine, engine.graphicsCommandPool);
 
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.oldLayout = oldLayout;
-    barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    VkImageMemoryBarrier barrier = {0};
+    barrier.sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout            = *oldLayout;
+    barrier.newLayout            = *newLayout;
+    barrier.srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image                = *image;
 
-    barrier.image = image;
-
-    if(newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+    if(*newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
     {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-        if(format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
-           format == VK_FORMAT_D24_UNORM_S8_UINT)
-        {
+        if(*format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+           *format == VK_FORMAT_D24_UNORM_S8_UINT
+        ){
             barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
         }
     }
@@ -77,85 +61,76 @@ void transitionImageLayout
     {
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     }
-    barrier.subresourceRange.baseMipLevel = 0;
+
     barrier.subresourceRange.levelCount = mipLevels;
-    barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
-    if(oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-       newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-    {
-        barrier.srcAccessMask = 0;
+    if(*oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+       *newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    ){
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        sourceStage      = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
-    else if(oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-            newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
+    else if(*oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+            *newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    ){
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
-    else if(oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-            newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+    else if(*oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            *newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
     {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        sourceStage      = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     }
     else
     {
-        riverThrow("unsupported layout transition!");
+        RV_ERROR("unsupported layout transition!");
     }
 
-    vkCmdPipelineBarrier(commandBuffer,
-                         sourceStage,
-                         destinationStage,
-                         0,
-                         0,
-                         nullptr,
-                         0,
-                         nullptr,
-                         1,
+    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, 0, 0, 0, 1,
                          &barrier);
 
-    flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool, engine.graphicsQueue);
+    flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool,
+                       engine.graphicsQueue);
 }
 
-internal void generateMipmaps
+f_internal void generateMipmaps
 (
-    EngineData          &engine,
-    const VkImage       &image,
-    const uint32_t      &mipLevels,
-    const int32_t       &texWidth,
-    const int32_t       &texHeight
+    EngineData    *engine,
+    const VkImage *image,
+    const u32     *mipLevels,
+    const i32     *texWidth,
+    const i32     *texHeight
 ){
     VkCommandBuffer commandBuffer = setupCommandBuffer(engine, engine.graphicsCommandPool);
 
     VkImageMemoryBarrier imageMemoryBarrier{};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.image = image;
-    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageMemoryBarrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.image                           = image;
+    imageMemoryBarrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
     imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
-    imageMemoryBarrier.subresourceRange.layerCount = 1;
-    imageMemoryBarrier.subresourceRange.levelCount = 1;
+    imageMemoryBarrier.subresourceRange.layerCount     = 1;
+    imageMemoryBarrier.subresourceRange.levelCount     = 1;
 
-    int32_t mipWidth = texWidth;
-    int32_t mipHeight = texHeight;
+    i32 mipWidth = texWidth;
+    i32 mipHeight = texHeight;
 
-    for(uint32_t i = 1; i < mipLevels; ++i)
+    for(u32 i = 1; i < mipLevels; ++i)
     {
         imageMemoryBarrier.subresourceRange.baseMipLevel = i - 1;
         imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -166,7 +141,7 @@ internal void generateMipmaps
         vkCmdPipelineBarrier(commandBuffer,
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             0, 0, nullptr, 0, nullptr,
+                             0, 0, 0, 0, 0,
                              1, &imageMemoryBarrier);
 
         VkImageBlit imageBlit{};
@@ -207,7 +182,7 @@ internal void generateMipmaps
         vkCmdPipelineBarrier(commandBuffer,
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                             0, 0, nullptr, 0, nullptr,
+                             0, 0, 0, 0, 0,
                              1, &imageMemoryBarrier);
 
         if(mipWidth > 1)
@@ -230,7 +205,7 @@ internal void generateMipmaps
     vkCmdPipelineBarrier(commandBuffer,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         0, 0, nullptr, 0, nullptr,
+                         0, 0, 0, 0, 0,
                          1, &imageMemoryBarrier);
 
     flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool, engine.graphicsQueue);
@@ -238,87 +213,64 @@ internal void generateMipmaps
 
 void createTextureImage
 (
-    EngineData              &engine,
-    const ProjectManifest   &manifest
+    EngineData *engine,
 ){
-    int texWidth;
-    int texHeight;
-    int texChannels;
+    u32 texWidth;
+    u32 texHeight;
+    // u32 texChannels;
 
-    stbi_uc *pixels =   stbi_load(manifest.projectTexturePath.string().c_str(),
-                                  &texWidth,
-                                  &texHeight,
-                                  &texChannels,
-                                  STBI_rgb_alpha);
-
-    engine.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-
-    const char* stbi_error = stbi_failure_reason();
-
+    u08 *pixels = imLoadFile(path, &texWidth, &texHeight, &texChannels, channels,
+                             bitdepth);
     if(!pixels)
     {
-        riverThrow(std::format("failed to load texture image from {}: {}",
-                               manifest.projectTexturePath.string(), stbi_failure_reason()));
+        RV_ERROR("failed to load texture image '"PRI_SV"'.", PRI_SV(path));
     }
+
+    engine.mipLevels = static_cast<u32>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
-    std::set<uint32_t> uniqueFamilyIndices =
+    std::set<u32> uniqueFamilyIndices =
     {
         engine.logicalQueueFamilies.graphicsIndex,
         engine.logicalQueueFamilies.transferIndex
     };
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer stagingBuffer = {0};
+    VkDeviceMemory stagingBufferMemory = {0};
 
-    createBuffer(engine,
-                 imageSize,
-                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 stagingBuffer,
-                 stagingBufferMemory,
-                 uniqueFamilyIndices);
+    createBuffer(engine, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 stagingBuffer, stagingBufferMemory, uniqueFamilyIndices);
 
-    void* data;
+    void *data = 0;
     vkMapMemory(engine.logicalDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    ::memcpy(data, pixels, static_cast<size_t>(imageSize));
+    memcpy(data, pixels, static_cast<size_t>(imageSize));
     vkUnmapMemory(engine.logicalDevice, stagingBufferMemory);
 
-    stbi_image_free(pixels);
+    free(pixels);
 
-    createImage(engine,
-                texWidth,
-                texHeight,
-                engine.mipLevels,
-                VK_FORMAT_R8G8B8A8_SRGB,
+    createImage(engine, texWidth, texHeight, engine.mipLevels, VK_FORMAT_R8G8B8A8_SRGB,
                 VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                engine.textureImage,
-                engine.textureImageMemory);
+                engine.textureImage, engine.textureImageMemory);
 
-    transitionImageLayout(engine,
-                          engine.textureImage,
-                          engine.mipLevels,
-                          VK_FORMAT_R8G8B8A8_SRGB,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
+    transitionImageLayout(engine, engine.textureImage, engine.mipLevels,
+                          VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    copyBufferToImage(engine,
-                      stagingBuffer,
-                      engine.textureImage,
-                      static_cast<uint32_t>(texWidth),
-                      static_cast<uint32_t>(texHeight));
+    copyBufferToImage(engine, stagingBuffer, engine.textureImage,
+                      (u32)(texWidth), (u32)(texHeight));
 
-    generateMipmaps(engine,
-                    engine.textureImage,
-                    engine.mipLevels,
-                    static_cast<int32_t>(texWidth),
-                    static_cast<int32_t>(texHeight));
+    generateMipmaps(engine, engine.textureImage, engine.mipLevels,
+                    (i32)(texWidth), (i32)(texHeight));
 
-    vkDestroyBuffer(engine.logicalDevice, stagingBuffer, nullptr);
-    vkFreeMemory(engine.logicalDevice, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(engine.logicalDevice, stagingBuffer, 0);
+    vkFreeMemory(engine.logicalDevice, stagingBufferMemory, 0);
 
     engine.textureImageView =   createImageView(engine,
                                                 engine.textureImage,
@@ -330,9 +282,9 @@ void createTextureImage
 void createImage
 (
     const EngineData            &engine,
-    const uint32_t              &width,
-    const uint32_t              &height,
-    const uint32_t              &mipLevels,
+    const u32              &width,
+    const u32              &height,
+    const u32              &mipLevels,
     const VkFormat              &format,
     const VkImageTiling         &tiling,
     const VkImageUsageFlags     &usage,
@@ -359,7 +311,7 @@ void createImage
     imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageCreateInfo.flags = 0;
 
-    VkResult result = vkCreateImage(engine.logicalDevice, &imageCreateInfo, nullptr, &image);
+    VkResult result = vkCreateImage(engine.logicalDevice, &imageCreateInfo, 0, &image);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create image!");
 
     VkMemoryRequirements imageMemRequirements;
@@ -370,7 +322,7 @@ void createImage
     mAllocInfo.allocationSize = imageMemRequirements.size;
     mAllocInfo.memoryTypeIndex = findSuitableMemoryType(engine, imageMemRequirements.memoryTypeBits, memPropFlags);
 
-    result = vkAllocateMemory(engine.logicalDevice, &mAllocInfo, nullptr, &imageMem);
+    result = vkAllocateMemory(engine.logicalDevice, &mAllocInfo, 0, &imageMem);
     RIV_ASSERT_VK_SUCCESS(result, "failed to allocate image memory!");
 
     vkBindImageMemory(engine.logicalDevice, image, imageMem, 0);
@@ -378,27 +330,27 @@ void createImage
 
 VkImageView createImageView
 (
-    const EngineData            &engine,
-    const VkImage               &image,
-    const uint32_t              &mipLevels,
-    const VkFormat              &format,
-    const VkImageAspectFlags    &aspectFlags
+    const EngineData         *engine,
+    const VkImage            *image,
+    const u32                *mipLevels,
+    const VkFormat           *format,
+    const VkImageAspectFlags *aspectFlags
 ){
-    VkImageViewCreateInfo viewCreateInfo{};
-    viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewCreateInfo.image = image;
-    viewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewCreateInfo.format = format;
-    viewCreateInfo.subresourceRange.aspectMask = aspectFlags;
-    viewCreateInfo.subresourceRange.baseMipLevel = 0;
-    viewCreateInfo.subresourceRange.levelCount = mipLevels;
+    VkImageViewCreateInfo viewCreateInfo = {0};
+    viewCreateInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewCreateInfo.image                           = image;
+    viewCreateInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+    viewCreateInfo.format                          = format;
+    viewCreateInfo.subresourceRange.aspectMask     = aspectFlags;
+    viewCreateInfo.subresourceRange.baseMipLevel   = 0;
+    viewCreateInfo.subresourceRange.levelCount     = mipLevels;
     viewCreateInfo.subresourceRange.baseArrayLayer = 0;
-    viewCreateInfo.subresourceRange.layerCount = 1;
+    viewCreateInfo.subresourceRange.layerCount     = 1;
 
     VkImageView imageView;
 
-    VkResult result = vkCreateImageView(engine.logicalDevice, &viewCreateInfo, nullptr, &imageView);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create texture image view!");
+    VkResult result = vkCreateImageView(engine.logicalDevice, &viewCreateInfo, 0, &imageView);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create texture image view!");
 
     return imageView;
 }
@@ -425,6 +377,6 @@ void createTextureSampler
     samplerCreateInfo.minLod = 0.0f;
     samplerCreateInfo.maxLod = static_cast<float>(engine.mipLevels);
 
-    VkResult result = vkCreateSampler(engine.logicalDevice, &samplerCreateInfo, nullptr, &engine.textureSampler);
+    VkResult result = vkCreateSampler(engine.logicalDevice, &samplerCreateInfo, 0, &engine.textureSampler);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create texture sampler!");
 }

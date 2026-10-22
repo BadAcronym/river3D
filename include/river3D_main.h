@@ -12,9 +12,9 @@
 #define s_global      static
 #define f_internal    static
 
-#define ENGINE_NAME = "river3D";
+#define ENGINE_NAME "river3D";
 //maybe get rid of this in the future
-#define MAX_FRAMES_IN_FLIGHT = 2;
+#define MAX_FRAMES_IN_FLIGHT 2;
 
 #ifdef BUILD_LINUX
     #include <X11/Xlib.h>
@@ -50,12 +50,12 @@
 
 typedef struct Vertex
 {
-    int32_t  x;
-    int32_t  y;
-    int32_t  z;
-    int32_t  textureY;
-    int32_t  textureX;
-    uint32_t colour;
+    i32 x;
+    i32 y;
+    i32 z;
+    i32 textureY;
+    i32 textureX;
+    u32 colour;
 }
 Vertex;
 
@@ -77,22 +77,22 @@ SwapchainSupportDetails;
 
 typedef struct QueueFamilyIndices
 {
-    uint32_t graphicsIndex; // = UINT32_MAX;
-    uint32_t transferIndex; // = UINT32_MAX;
-    uint32_t presentIndex;  // = UINT32_MAX;
+    u32 graphicsIndex; // = UINT32_MAX;
+    u32 transferIndex; // = UINT32_MAX;
+    u32 presentIndex;  // = UINT32_MAX;
 }
 QueueFamilyIndices;
 
 typedef struct RiverConfig
 {
-    uint8_t    renderer;
-    uint8_t    backgrounds;
-    uint32_t   windowHeight;
-    uint32_t   windowWidth;
-    uint32_t   canvasHidth;
-    uint32_t   canvasHeight;
-    uint32_t   choices;
-    StringView projectName;        // = "RV_UNINITIALIZED_STRING";
+    u08    renderer;
+    u08    backgrounds;
+    u32        windowHeight;
+    u32        windowWidth;
+    u32        canvasHidth;
+    u32        canvasHeight;
+    u32        choices;
+    StringView projectName; // = "RV_UNINITIALIZED_STRING";
     StringView projectVersion;     // = "RV_UNINITIALIZED_STRING";
     StringView projectLog;         // = "RV_UNINITIALIZED_PATH";
     StringView projectModelPath;   // = "RV_UNINITIALIZED_PATH";
@@ -120,7 +120,7 @@ typedef struct VulkanData
     VkSwapchainKHR                   swapchain;
     VkFormat                         swapchainImageFormat;
     VkExtent2D                       swapchainExtent;
-    uint32_t                         swapchainImageCount;
+    u32                         swapchainImageCount;
     VkImage                          *swapchainImages;
     VkImageView                      *swapchainImageViews;
     VkFramebuffer                    *swapchainFramebuffers;
@@ -141,7 +141,7 @@ typedef struct VulkanData
     VkSemaphore                      acquireSemaphore;
     VkFence                          *inFlightFences;
     Vertex                           *vertices;
-    uint32_t                         *vertexIndices;
+    u32                         *vertexIndices;
     VkBuffer                         vertexBuffer;
     VkDeviceMemory                   vertexBufferMemory;
     VkDeviceSize                     vertSize;
@@ -151,7 +151,7 @@ typedef struct VulkanData
     VkBuffer                         *uniformBuffers;
     VkDeviceMemory                   *uniformBuffersMemory;
     void                             *uniformBuffersMapped;
-    uint32_t                         mipLevels;
+    u32                         mipLevels;
     VkImage                          textureImage;
     VkImageView                      textureImageView;
     VkDeviceMemory                   textureImageMemory;
@@ -163,10 +163,10 @@ VulkanData;
 typedef struct RiverImage
 {
     StringView path;
-    uint8_t    *data;
-    uint8_t    channels;
-    uint32_t   width;
-    uint32_t   height;
+    u08    *data;
+    u08    channels;
+    u32   width;
+    u32   height;
 
     #ifdef BUILD_LINUX
     Pixmap   pixmap;
@@ -226,7 +226,10 @@ extern void riverSetupLog
     const StringView path
 );
 
-extern void riverCloseLog();
+extern void riverCloseLog
+(
+    void
+);
 
 #ifdef DEBUG
 const char* validationLayers[4] =
@@ -242,5 +245,5 @@ const char* validationLayers[4] =
 extern void riverLog
 (
     const StringView text,
-    const uint8_t    level
+    const u08        level
 );
