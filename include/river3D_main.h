@@ -85,8 +85,8 @@ QueueFamilyIndices;
 
 typedef struct RiverConfig
 {
-    u08    renderer;
-    u08    backgrounds;
+    u08        renderer;
+    u08        backgrounds;
     u32        windowHeight;
     u32        windowWidth;
     u32        canvasHidth;
@@ -163,14 +163,14 @@ VulkanData;
 typedef struct RiverImage
 {
     StringView path;
-    u08    *data;
-    u08    channels;
-    u32   width;
-    u32   height;
+    u08        *data;
+    u08        channels;
+    u32        width;
+    u32        height;
 
     #ifdef BUILD_LINUX
-    Pixmap   pixmap;
-    Picture  picture;
+    Pixmap     pixmap;
+    Picture    picture;
     #endif
 
     #ifdef BUILD_WINDOWS
@@ -181,9 +181,10 @@ RiverImage;
 
 typedef struct EngineData
 {
-    StringView windowName;
-    bool       framebufferResized;
-    VulkanData *vkData;
+    StringView        windowName;
+    bool              framebufferResized;
+    VulkanData        *vkData;
+    RiverConfig       config;
 
 #ifdef BUILD_LINUX
     Display           *display;
@@ -196,12 +197,12 @@ typedef struct EngineData
 #endif
 
 #ifdef BUILD_WINDOWS
-    HINSTANCE          instance;
-    HWND               window;
-    HDC                context;
-    HBITMAP            cursorBitmap;
-    HBITMAP            cursorMask;
-    HCURSOR            hCursor;
+    HINSTANCE         instance;
+    HWND              window;
+    HDC               context;
+    HBITMAP           cursorBitmap;
+    HBITMAP           cursorMask;
+    HCURSOR           hCursor;
 #endif
 }
 EngineData;
@@ -232,7 +233,10 @@ extern void riverCloseLog
 );
 
 #ifdef DEBUG
-const char* validationLayers[4] =
+
+#define VALIDATION_LAYER_COUNT 4
+
+const char* validationLayers[VALIDATION_LAYER_COUNT] =
 {
     "VK_LAYER_KHRONOS_validation",
     "VK_LAYER_KHRONOS_synchronization2",

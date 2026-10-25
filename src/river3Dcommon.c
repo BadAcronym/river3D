@@ -3,6 +3,9 @@
 
 #include "vulkan/vulkan_core.h"
 
+typedef PFN_vkCreateDebugUtilsMessengerEXT  vkCreateMsgr;
+typedef PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyMsgr;
+
 #ifdef DEBUG
 f_internal const char* riverTranslateVkResult
 (
@@ -79,15 +82,17 @@ f_internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
 
 f_internal VkResult CreateDebugUtilsMessengerEXT
 (
-    VkInstance                               instance,
+    const EngineData                         *engine,
     const VkDebugUtilsMessengerCreateInfoEXT *createInfo,
-    const VkAllocationCallbacks              *allocator,
-    VkDebugUtilsMessengerEXT                 *debugMessenger
+    const VkAllocationCallbacks              *allocator
 ){
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    vkCreateMsgr func = (vkCreateMsgr)
+                        vkGetInstanceProcAddr(engine->vkData->instance,
+                                              "vkCreateDebugUtilsMessengerEXT");
     if(func)
     {
-        return func(instance, createInfo, allocator, debugMessenger);
+        return func(engine->vkData->instance, createInfo, allocator,
+                    &engine->vkData->debugMessenger);
     }
     else
     {
@@ -95,55 +100,68 @@ f_internal VkResult CreateDebugUtilsMessengerEXT
     }
 }
 
-f_internal VkBool32 checkValidationLayerSupport
+f_internal void DestroyDebugUtilsMessengerEXT
+(
+    const EngineData            *engine,
+    const VkAllocationCallbacks *allocator
+){
+    vkDestroyMsgr func = (vkDestroyMsgr)
+                         vkGetInstanceProcAddr(engine->vkData->instance,
+                                               "vkDestroyDebugUtilsMessengerEXT");
+    if(func)
+    {
+        func(engine->vkData->instance, engine->vkData->debugMessenger, allocator);
+    }
+}
+
+f_internal bool checkValidationLayerSupport
 (
     void
 ){
-    u32 layerCount = 0;
-    vkEnumerateInstanceLayerProperties(&layerCount, 0);
+    u32 availLayerCount = 0;
+    vkEnumerateInstanceLayerProperties(&availLayerCount, 0);
 
-    VkLayerProperties layers[layerCount];
-    vkEnumerateInstanceLayerProperties(&layerCount, layers);
+    VkLayerProperties layers[availLayerCount];
+    vkEnumerateInstanceLayerProperties(&availLayerCount, layers);
 
-    for(const char *layer : validationLayers)
+    for(u16 i = 0; i < VALIDATION_LAYER_COUNT; ++i)
     {
-        VkBool32 layerFound = VK_FALSE;
+        StringView required = pdCstrSV(validationLayers[i]);
 
-        for(const auto &layerPresent : layerVec)
+        for(u16 j = 0; j < availLayerCount; ++j)
         {
-            if(0 == strcmp(layerPresent.layerName, layer))
+            StringView avail = pdCstrSV(layers[j].layerName);
+            if(pdSVSame(required, avail))
             {
-                layerFound = VK_TRUE;
-                break;
+                goto found;
             }
         }
-        if(!layerFound)
-        {
-            StringView msg = cstr_sv("validation layer not found: ");
-            msg += layer;
+        RV_ERROR("unable to find validation layer: '"PRI_SV"'.", ARG_SV(required));
+        goto notfound;
 
-            riverLog(msg, RIV_LOG_LEVEL_WARN);
-
-            return VK_FALSE;
-        }
+    found:
+        continue;
     }
 
-    return VK_TRUE;
+    return true;
+
+notfound:
+    return false;
 }
 
 f_internal void populateDebugMessengerCreateInfo
 (
     VkDebugUtilsMessengerCreateInfoEXT *createInfo
 ){
-    createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
-                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
-                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = debugCallback;
+    *createInfo = (VkDebugUtilsMessengerCreateInfoEXT){0};
+    createInfo->sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo->messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo->messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo->pfnUserCallback = debugCallback;
 }
 
 f_internal void setupDebugMessenger
@@ -154,22 +172,10 @@ f_internal void setupDebugMessenger
     VkDebugUtilsMessengerCreateInfoEXT createInfo = {0};
     populateDebugMessengerCreateInfo(&createInfo);
 
-    VkResult result = CreateDebugUtilsMessengerEXT(engine->instance, &createInfo, 0, &engine.debugMessenger);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to set up debug messenger.");
+    VkResult result = CreateDebugUtilsMessengerEXT(engine, &createInfo, 0);
+    RV_ASSERT(result == VK_SUCCESS, "failed to set up debug messenger.");
 }
 
-f_internal void DestroyDebugUtilsMessengerEXT
-(
-    const EngineData            *engine,
-    const VkAllocationCallbacks *allocator
-){
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(engine.instance,
-                                                                           "vkDestroyDebugUtilsMessengerEXT");
-    if(func)
-    {
-        func(engine.instance, engine.debugMessenger, allocator);
-    }
-}
 #endif
 
 f_internal StringView* getRequiredExtensions
@@ -190,7 +196,7 @@ f_internal StringView* getRequiredExtensions
     return extensions;
 }
 
-f_internal VkBool32 checkInstanceExtensions
+f_internal bool checkInstanceExtensions
 (
     StringView            *requiredExt,
     VkExtensionProperties *instanceExt
@@ -224,13 +230,14 @@ f_internal void createInstance
 (
     EngineData *engine
 ){
-    #ifdef DEBUG
-        RIV_ASSERT(checkValidationLayerSupport(), "validation layers requested, but not available!");
-    #endif
+    RV_ASSERT(checkValidationLayerSupport(),
+              "validation layers requested, but not available!");
+
+    char cstrBuf[256] = {0};
 
     VkApplicationInfo appInfo = {0};
     appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName   = engine->projectName;
+    appInfo.pApplicationName   = pdSVCstr(engine->config.projectName, cstrBuf);
     appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 1);
     appInfo.pEngineName        = ENGINE_NAME;
     appInfo.engineVersion      = VK_MAKE_API_VERSION(0, 0, 0, 1);
