@@ -198,7 +198,7 @@ void pickPhysicalDevice
 ){
     u32 deviceCount = 0;
 
-    vkEnumeratePhysicalDevices(engine.instance, &deviceCount, 0);
+    vkEnumeratePhysicalDevices(engine->vkData->instance, &deviceCount, 0);
     if(0 == deviceCount)
     {
         riverLog("failed to find any GPU with vulkan support!", RIV_LOG_LEVEL_ERROR);

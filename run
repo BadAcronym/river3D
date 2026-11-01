@@ -19,22 +19,35 @@ args_always="-DBUILD_LINUX \
 -Ivendor/imgsurf/include/ \
 -Ivendor/imgsurf/vendor/datasurf/include/ \
 -Ivendor/imgsurf/vendor/datasurf/vendor/puddle/include/ \
+-Wextra -Wall -Wpedantic -Wconversion -Wshadow -Wsign-compare -Wtype-limits -Wunused
+-fPIC"
+
+args_common="src/river3D_common.c \
+./vendor/imgsurf/src/imgsurf_main.c \
+./vendor/imgsurf/src/imgsurf_format_bmp.c \
+./vendor/imgsurf/src/imgsurf_format_qoi.c \
+./vendor/imgsurf/src/imgsurf_format_png.c \
 vendor/imgsurf/vendor/datasurf/src/datasurf_zlib.c \
 vendor/imgsurf/vendor/datasurf/src/datasurf_huffman.c \
 vendor/imgsurf/vendor/datasurf/src/datasurf_algo_deflate.c \
 vendor/imgsurf/vendor/datasurf/vendor/puddle/src/pd_string_view.c \
 vendor/imgsurf/vendor/datasurf/vendor/puddle/src/linux_pd_path.c \
--Wextra -Wall -Wpedantic -Wconversion -Wshadow -Wsign-compare -Wtype-limits -Wunused
--fPIC"
-
-args_common="src/river3Dcommon.c \
 -c"
 
 args_software="src/linux_river3Dsoftware.c \
-./vendor/imgsurf/src/imgsurf_main.c \
-./vendor/imgsurf/src/imgsurf_format_bmp.c \
-./vendor/imgsurf/src/imgsurf_format_qoi.c \
-./vendor/imgsurf/src/imgsurf_format_png.c \
+-Lbin/$build/ \
+-lriver3Dcommon \
+-shared \
+-fuse-ld=mold"
+
+args_vulkan="src/river3Dvulkan_buffer.c \
+src/river3Dvulkan_common.c \
+src/river3Dvulkan_device.c \
+src/river3Dvulkan_image.c \
+src/river3Dvulkan_main.c \
+src/river3Dvulkan_pipeline.c \
+src/river3Dvulkan_swapchain.c \
+src/river3Dvulkan_window.c \
 -Lbin/$build/ \
 -lriver3Dcommon \
 -shared \
@@ -90,8 +103,8 @@ function compile()
     echo ""
     echo -e "\033[36mcreating static libary libriver3Dcommon.a...\033[0m"
     echo ""
-    ar rcs ./bin/$build/libriver3Dcommon.a river3D_util.o string_view.o \
-    river3Dcommon_main.o linux_river3Dcommon.o linux_pd_path.o
+    ar rcs ./bin/$build/libriver3Dcommon.a pd_string_view.o \
+    river3D_common.o linux_pd_path.o
     if [[ $? != 0 ]]
     then
         echo -e "\033[31m\nERROR: ar failed to create static library.\n\033[0m"
@@ -111,6 +124,20 @@ function compile()
         exit -1
     fi
     mv ./a.out ./bin/$build/libriver3Dsoftware.so
+
+    echo ""
+    echo -e "\033[36mcompiling river3Dvulkan...\033[0m"
+    echo ""
+    echo "compiling $build build with the following command:"
+    echo "$compiler $1 $args_vulkan"
+
+    $($compiler $1 $args_vulkan)
+    if [[ $? != 0 ]]
+    then
+        echo -e "\033[31m\nERROR: $compiler failed to compile river3Dvulkan.\n\033[0m"
+        exit -1
+    fi
+    mv ./a.out ./bin/$build/libriver3Dvulkan.so
 }
 
 if [[ $build = "release" ]]
