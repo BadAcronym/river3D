@@ -102,7 +102,7 @@ f_internal u32 rateDeviceSuitability
     const VkPhysicalDevice *device
 ){
     u32 score = 0;
-    QueueFamilyIndices indices = findQueueFamilies(device, engine->surface);
+    QueueFamilyIndices indices = findQueueFamilies(device, &engine->vkData->surface);
 
     if( indices.graphicsIndex == UINT32_MAX ||
         indices.transferIndex == UINT32_MAX ||
@@ -130,8 +130,9 @@ f_internal u32 rateDeviceSuitability
     }
     else
     {
-        SwapchainSupportDetails swapChainSupport = querySwapchainSupport(device, engine.surface);
-        if(swapChainSupport.formats.empty() || swapChainSupport.presentModes.empty())
+        SwapchainSupportDetails swapchainSupport =
+            querySwapchainSupport(device, engine->vkData->surface);
+        if(swapchainSupport.formats.empty() || swapchainSupport.presentModes.empty())
         {
             return 0;
         }

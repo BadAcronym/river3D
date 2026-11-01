@@ -1,79 +1,89 @@
 #include "river3D_main.h"
 
+#include "pd_dyn_arr.h"
+
 #include "vulkan/vulkan_core.h"
 
-internal VkExtent2D chooseSwapExtent
+f_internal VkExtent2D chooseSwapExtent
 (
-    const VkSurfaceCapabilitiesKHR  &capabilities,
-    GLFWwindow                      *window
+    const VkSurfaceCapabilitiesKHR *capabilities
+    // GLFWwindow                     *window
 ){
-    if(std::numeric_limits<u32>::max() != capabilities.currentExtent.width)
+    if(capabilities->currentExtent.width != U32MAX)
     {
-        return capabilities.currentExtent;
+        return capabilities->currentExtent;
     }
     else
     {
-        int width, height;
+        u32 width  = 0;
+        u32 height = 0;
         glfwGetFramebufferSize(window, &width, &height);
 
         VkExtent2D actualExtent =
         {
-            static_cast<u32>(width),
-            static_cast<u32>(height)
+            width, height
         };
 
-        actualExtent.width =    std::clamp(actualExtent.width,
-                                           capabilities.minImageExtent.width,
-                                           capabilities.maxImageExtent.width);
+        actualExtent.width = std::clamp(actualExtent.width,
+                                        capabilities.minImageExtent.width,
+                                        capabilities.maxImageExtent.width);
 
-        actualExtent.height =   std::clamp(actualExtent.height,
-                                           capabilities.minImageExtent.height,
-                                           capabilities.maxImageExtent.height);
+        actualExtent.height = std::clamp(actualExtent.height,
+                                         capabilities.minImageExtent.height,
+                                         capabilities.maxImageExtent.height);
+
         return actualExtent;
     }
 }
 
 void createSwapchain
 (
-    EngineData          &engine,
-    const UserSettings  &settings
+    EngineData *engine
 ){
-    SwapchainSupportDetails swapchainSupport = querySwapchainSupport(engine.physicalDevice, engine.surface);
+    SwapchainSupportDetails swapchainSupport =
+        querySwapchainSupport(engine->vkData->physicalDevice, engine->vkData->surface);
     VkSurfaceFormatKHR surfaceFormat = swapchainSupport.formats[0];
 
-    for(const auto &availableFormat : swapchainSupport.formats)
+    u64 arrSize = pdArrSize(swapchainSupport.formats);
+    for(u64 i = 0; i < arrSize; ++i)
     {
-        if( VK_FORMAT_B8G8R8A8_SRGB == availableFormat.format &&
-            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        VkSurfaceFormatKHR curr = swapchainSupport.formats[i];
+        if(curr.format     == VK_FORMAT_B8G8R8A8_SRGB &&
+           curr.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
         ){
-            surfaceFormat = availableFormat;
+            surfaceFormat = curr;
         }
     }
 
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR; //fallback
 
-    for(const auto &availablePresentMode : swapchainSupport.presentModes)
+    arrSize = pdArrSize(swapchainSupport.presentModes);
+    for(u64 i = 0; i < arrSize; ++i)
     {
-        if(availablePresentMode == settings.presentMode)
+        VkPresentModeKHR curr = swapchainSupport.presentModes[i];
+        if(curr == engine->config.presentMode)
         {
-            presentMode = availablePresentMode;
+            presentMode = curr;
         }
     }
 
-    VkExtent2D extent = chooseSwapExtent(swapchainSupport.capabilities, engine.window);
+    VkExtent2D extent = chooseSwapExtent(swapchainSupport.capabilities, engine->window);
 
-    engine.swapchainImageCount = swapchainSupport.capabilities.minImageCount + 1;
+    engine->vkData->swapchainImageCount =
+        swapchainSupport.capabilities.minImageCount + 1;
 
-    if(0 < swapchainSupport.capabilities.maxImageCount &&
-        engine->swapchainImageCount > swapchainSupport.capabilities.maxImageCount
+    if(swapchainSupport.capabilities.maxImageCount > 0 &&
+       engine->vkData->swapchainImageCount >
+       swapchainSupport.capabilities.maxImageCount
     ){
-        engine->swapchainImageCount = swapchainSupport.capabilities.maxImageCount;
+        engine->vkData->swapchainImageCount =
+            swapchainSupport.capabilities.maxImageCount;
     }
 
     VkSwapchainCreateInfoKHR createInfo = {0};
     createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.surface          = engine->surface;
-    createInfo.minImageCount    = engine->swapchainImageCount;
+    createInfo.surface          = engine->vkData->surface;
+    createInfo.minImageCount    = engine->vkData->swapchainImageCount;
     createInfo.imageFormat      = surfaceFormat.format;
     createInfo.imageColorSpace  = surfaceFormat.colorSpace;
     createInfo.imageExtent      = extent;
@@ -82,11 +92,12 @@ void createSwapchain
 
     u32 queueFamilyIndices[] =
     {
-        engine.logicalQueueFamilies.graphicsIndex,
-        engine.logicalQueueFamilies.presentIndex
+        engine->vkData->logicalQueueFamilies.graphicsIndex,
+        engine->vkData->logicalQueueFamilies.presentIndex
     };
 
-    if(engine.logicalQueueFamilies.graphicsIndex != engine.logicalQueueFamilies.presentIndex)
+    if(engine->vkData->logicalQueueFamilies.graphicsIndex !=
+       engine->vkData->logicalQueueFamilies.presentIndex)
     {
         createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = sizeof(queueFamilyIndices)/sizeof(u32);
@@ -99,15 +110,16 @@ void createSwapchain
         createInfo.pQueueFamilyIndices   = 0;
     }
 
-    createInfo.preTransform = swapchainSupport.capabilities.currentTransform;
+    createInfo.preTransform   = swapchainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = presentMode;
-    createInfo.clipped = VK_TRUE;
+    createInfo.presentMode    = presentMode;
+    createInfo.clipped        = VK_TRUE;
 
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    VkResult result = vkCreateSwapchainKHR(engine.logicalDevice, &createInfo, 0, &engine.swapchain);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create swap chain!");
+    VkResult result = vkCreateSwapchainKHR(engine.logicalDevice, &createInfo, 0,
+                                           &engine.swapchain);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create swapchain!");
 
     vkGetSwapchainImagesKHR(engine.logicalDevice, engine.swapchain,
                             &engine.swapchainImageCount, 0);

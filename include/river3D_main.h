@@ -105,7 +105,7 @@ RiverConfig;
 typedef struct VulkanData
 {
     #ifdef DEBUG
-    VkDebugUtilsMessengerEXT        debugMessenger;
+    VkDebugUtilsMessengerEXT         debugMessenger;
     #endif
 
     VkPresentModeKHR                 presentMode;
@@ -120,7 +120,7 @@ typedef struct VulkanData
     VkSwapchainKHR                   swapchain;
     VkFormat                         swapchainImageFormat;
     VkExtent2D                       swapchainExtent;
-    u32                         swapchainImageCount;
+    u32                              swapchainImageCount;
     VkImage                          *swapchainImages;
     VkImageView                      *swapchainImageViews;
     VkFramebuffer                    *swapchainFramebuffers;
@@ -141,7 +141,7 @@ typedef struct VulkanData
     VkSemaphore                      acquireSemaphore;
     VkFence                          *inFlightFences;
     Vertex                           *vertices;
-    u32                         *vertexIndices;
+    u32                              *vertexIndices;
     VkBuffer                         vertexBuffer;
     VkDeviceMemory                   vertexBufferMemory;
     VkDeviceSize                     vertSize;
@@ -151,7 +151,7 @@ typedef struct VulkanData
     VkBuffer                         *uniformBuffers;
     VkDeviceMemory                   *uniformBuffersMemory;
     void                             *uniformBuffersMapped;
-    u32                         mipLevels;
+    u32                              mipLevels;
     VkImage                          textureImage;
     VkImageView                      textureImageView;
     VkDeviceMemory                   textureImageMemory;

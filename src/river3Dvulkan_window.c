@@ -1,15 +1,17 @@
 #include "river3D_main.h"
 
-f_internal void framebufferResizeCallback
-(
-    // GLFWwindow *window,
-    // int        width,
-    // int        height
-){
-    // EngineData *engine = static_cast<EngineData*>(glfwGetWindowUserPointer(window));
+#include "rv_print_macros.h"
 
-    // engine->framebufferResized = VK_TRUE;
-}
+// f_internal void framebufferResizeCallback
+// (
+//     GLFWwindow *window,
+//     u32 width,
+//     u32 height
+// ){
+//     // EngineData *engine = static_cast<EngineData*>(glfwGetWindowUserPointer(window));
+//
+//     // engine->framebufferResized = VK_TRUE;
+// }
 
 void createSurface
 (
