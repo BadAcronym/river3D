@@ -273,17 +273,15 @@ f_internal void createInstance
         createInfo.pNext = 0;
     #endif
 
-    VkResult result = vkCreateInstance(&createInfo, 0, &engine.instance);
+    VkResult result = vkCreateInstance(&createInfo, 0, &engine->vkData->instance);
     RV_ASSERT(result == VK_SUCCESS, "failed to create instance.");
 }
 
 void vkInit
 (
-    EngineData            *engine,
-    const ProjectManifest *manifest,
-    const UserSettings    *settings
+    EngineData *engine
 ){
-    createInstance(engine, manifest);
+    createInstance(engine);
 
     #ifdef DEBUG
         setupDebugMessenger(engine);
@@ -357,8 +355,8 @@ void vkShutdown
         DestroyDebugUtilsMessengerEXT(engine, 0);
     #endif
 
-    vkDestroySurfaceKHR(engine.instance, engine.surface, 0);
-    vkDestroyInstance(engine.instance, 0);
+    vkDestroySurfaceKHR(engine->vkData->instance, engine.surface, 0);
+    vkDestroyInstance(engine->vkData->instance, 0);
 }
 
 void drawFrame
@@ -455,137 +453,4 @@ void drawFrame
     }
 
     currentFrame = (++currentFrame) % MAX_FRAMES_IN_FLIGHT;
-}
-
-StringView getProjectRoot
-(
-    StringView rootName
-){
-    StringView current = pdExpandPath(".");
-
-    for(; current.size < RV_MAX_PATH;)
-    {
-        if(sv_same(current, rootName))
-        {
-            riverLog(std::format("set project root to "PRI_SV" with length %u",
-                                 ARG_SV(current), current.size),
-                     RV_LOG_LEVEL_TRACE);
-
-            return current;
-        }
-        current = pdParentPath(current);
-    }
-    return "RV_PATH_UNDETERMINED";
-}
-
-void riverSetupLog
-(
-    const StringView path
-){
-    logFile.open(path, std::ios::trunc);
-    RIV_ASSERT(logFile.is_open(), "failed to open log file!");
-}
-
-void riverCloseLog
-(
-    void
-){
-    if(logFile.is_open())
-    {
-        logFile.close();
-    }
-}
-
-std::string riverTimestamp()
-{
-    const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::tm buf{};
-
-#ifdef _WIN32
-    localtime_s(&buf, &now);
-#else
-    localtime_r(&now, &buf);
-#endif
-    if ((buf.tm_hour > 23) || (buf.tm_hour < 0) ||
-        (buf.tm_min  > 59) || (buf.tm_min  < 0) ||
-        (buf.tm_sec  > 60) || (buf.tm_sec  < 0))
-    {
-      return "[??:??:??] ";
-    }
-
-    return std::format ("[{:02}:{:02}:{:02}] ", buf.tm_hour, buf.tm_min, buf.tm_sec);
-}
-
-void riverLog
-(
-    const std::string_view  text,
-    const RiverLogLevel     &level
-){
-    if(level < logLevel)
-    {
-        return;
-    }
-
-#ifdef DEBUG
-    if(level == RIV_LOG_LEVEL_WARN || level == RIV_LOG_LEVEL_ERROR)
-    {
-        std::cerr << logLevelANSI[level] << riverTimestamp()
-            << logLevelStamps[level] << text << clearANSI << '\n';
-        return;
-    }
-
-    std::cout << logLevelANSI[level] << riverTimestamp()
-        << logLevelStamps[level] << text << clearANSI << '\n';
-#else
-
-    if(level == RIV_LOG_LEVEL_WARN || level == RIV_LOG_LEVEL_ERROR)
-    {
-        std::cerr << riverTimestamp() << logLevelStamps[level] << text << '\n';
-    }
-
-    logFile << riverTimestamp() << logLevelStamps[level] << text << '\n' << std::flush;
-#endif
-}
-
-#ifdef DEBUG
-bool riverAssert
-(
-    const bool              &condition,
-    const std::string_view  assertFailureMsg
-){
-    if(condition)
-    {
-        return true;
-    }
-
-    std::cerr << logLevelANSI[RIV_LOG_LEVEL_ASSERT] << riverTimestamp()
-        << logLevelStamps[RIV_LOG_LEVEL_ASSERT] << assertFailureMsg << clearANSI << '\n';
-
-    abort();
-}
-
-bool riverAssertVkSuccess
-(
-    const VkResult          &result,
-    const std::string_view  assertFailureMsg
-){
-    if(result == VK_SUCCESS)
-    {
-        return true;
-    }
-    std::cerr << logLevelANSI[RIV_LOG_LEVEL_ASSERT] << riverTimestamp() << logLevelStamps[RIV_LOG_LEVEL_ASSERT]
-        << riverTranslateVkResult(result) << ": " << assertFailureMsg << clearANSI << '\n';
-
-    abort();
-}
-#endif
-
-void riverThrow
-(
-    const std::string_view throwMsg
-){
-    std::cerr << logLevelANSI[RIV_LOG_LEVEL_ASSERT] << riverTimestamp()
-        << logLevelStamps[RIV_LOG_LEVEL_ASSERT] << ": " << throwMsg << clearANSI << '\n';
-
-    abort();
 }

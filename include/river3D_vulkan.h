@@ -45,7 +45,7 @@ extern void createBuffer
     const VkMemoryPropertyFlags *memPropFlags,
     VkBuffer                    *buffer,
     VkDeviceMemory              *bufferMemory,
-    const std::set<uint32_t>    *uniqueQueueFamilies
+    const std::set<u32>         *uniqueQueueFamilies
 );
 
 extern void createDepthResources
@@ -53,10 +53,10 @@ extern void createDepthResources
     EngineData *engine
 );
 
-extern uint32_t findSuitableMemoryType
+extern u32 findSuitableMemoryType
 (
     const EngineData            *engine,
-    const uint32_t              *typeFilter,
+    const u32                   *typeFilter,
     const VkMemoryPropertyFlags *flags
 );
 
@@ -81,7 +81,7 @@ extern VkFormat findSupportedFormat
 extern void updateUniformBuffer
 (
     const EngineData *engine,
-    uint32_t         currentImage //redundant?
+    u32         currentImage //redundant?
 );
 
 extern VkVertexInputBindingDescription getVertexBindingDescription();
@@ -90,9 +90,9 @@ extern VkVertexInputAttributeDescription* getVertexAttributeDescriptions();
 extern void createImage
 (
     const EngineData            *engine,
-    const uint32_t              *width,
-    const uint32_t              *height,
-    const uint32_t              *mipLevels,
+    const u32                   *width,
+    const u32                   *height,
+    const u32                   *mipLevels,
     const VkFormat              *format,
     const VkImageTiling         *tiling,
     const VkImageUsageFlags     *usage,
@@ -105,7 +105,7 @@ extern VkImageView createImageView
 (
     const EngineData         *engine,
     const VkImage            *image,
-    const uint32_t           *mipLevels,
+    const u32                *mipLevels,
     const VkFormat           *format,
     const VkImageAspectFlags *aspectFlags
 );
@@ -124,7 +124,7 @@ extern void transitionImageLayout
 (
     EngineData          *engine,
     const VkImage       *image,
-    const uint32_t      *mipLevels,
+    const u32           *mipLevels,
     const VkFormat      *format,
     const VkImageLayout *oldLayout,
     const VkImageLayout *newLayout
@@ -152,16 +152,16 @@ extern void createCommandBuffers
 
 extern VkCommandBuffer setupCommandBuffer
 (
-    const EngineData    *engine,
-    VkCommandPool       &commandPool
+    const EngineData *engine,
+    VkCommandPool    *commandPool
 );
 
 extern void flushCommandBuffer
 (
-    const EngineData        *engine,
-    const VkCommandBuffer   &commandBuffer,
-    const VkCommandPool     &commandPool,
-    const VkQueue           &queue
+    const EngineData      *engine,
+    const VkCommandBuffer *commandBuffer,
+    const VkCommandPool   *commandPool,
+    const VkQueue         *queue
 );
 
 extern void createDescriptorSetLayout
@@ -193,7 +193,7 @@ extern void recordCommandBuffer
 (
     const EngineData      *engine,
     const VkCommandBuffer *commandBuffer,
-    const uint32_t        *imageIndex
+    const u32             *imageIndex
 );
 
 extern void createSwapchain
