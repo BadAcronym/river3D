@@ -15,13 +15,13 @@ void loadModel
     bool result = tinyobj::LoadObj(&attributes, &shapes, &materials, &warn, &error, modelPath.string().c_str());
     RIV_ASSERT(result, (warn + error));
 
-    std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+    std::unordered_map<Vertex, uint32_t> uniqueVertices = {0};
 
     for(const tinyobj::shape_t &shape : shapes)
     {
         for(const tinyobj::index_t &index : shape.mesh.indices)
         {
-            Vertex vertex{};
+            Vertex vertex = {0};
 
             vertex.position =
             {
@@ -53,7 +53,7 @@ VkVertexInputBindingDescription getVertexBindingDescription
 (
     void
 ){
-    VkVertexInputBindingDescription bindingDescription{};
+    VkVertexInputBindingDescription bindingDescription = {0};
     bindingDescription.binding   = 0;
     bindingDescription.stride    = sizeof(Vertex);
     bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -114,7 +114,7 @@ void createBuffer
     VkDeviceMemory              *bufferMemory,
     const std::set<uint32_t>    *uniqueQueueFamilies
 ){
-    VkBufferCreateInfo bufferInfo{};
+    VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size  = bufferSize;
     bufferInfo.usage = usageFlags;
@@ -139,7 +139,7 @@ void createBuffer
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(engine.logicalDevice, buffer, &memRequirements);
 
-    VkMemoryAllocateInfo allocInfo{};
+    VkMemoryAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = findSuitableMemoryType(engine, memRequirements.memoryTypeBits, memPropFlags);
@@ -160,7 +160,7 @@ internal void copyBuffer
   VkCommandBuffer commandBuffer = setupCommandBuffer(engine,
                                                      engine.transferCommandPool);
 
-  VkBufferCopy transferCopyRegion{};
+  VkBufferCopy transferCopyRegion = {0};
   transferCopyRegion.size = bufferSize;
   transferCopyRegion.srcOffset = 0;
   transferCopyRegion.dstOffset = 0;
@@ -267,7 +267,7 @@ void updateUniformBuffer
     std::chrono::time_point currentTime = std::chrono::high_resolution_clock::now();
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
-    UniformBufferObject uniformBuffer{};
+    UniformBufferObject uniformBuffer = {0};
     uniformBuffer.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(20.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     uniformBuffer.view = glm::lookAt(glm::vec3(1.0f, 0.0f, 0.3f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     uniformBuffer.projection =  glm::perspective(glm::radians(35.0f),

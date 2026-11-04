@@ -1,6 +1,9 @@
 #include "vulkan/vulkan_core.h"
 
 #include "river3D_main.h"
+#include "rv_print_macros.h"
+
+#include "pd_dyn_arr.h"
 
 s_global VkDynamicState dynamicStates[2] =
 {
@@ -19,7 +22,8 @@ f_internal VkShaderModule createShaderModule
     createInfo.pCode    = (const uint32_t*)(code.data);
 
     VkShaderModule shaderModule = {0};
-    VkResult result = vkCreateShaderModule(engine->logicalDevice, &createInfo, 0, &shaderModule);
+    VkResult result = vkCreateShaderModule(engine->vkData->logicalDevice,
+                                           &createInfo, 0, &shaderModule);
     RV_ASSERT(result == VK_SUCCESS, "failed to create shader module!");
 
     return shaderModule;
@@ -29,8 +33,8 @@ void createGraphicsPipeline
 (
     EngineData *engine
 ){
-    StringView vertShaderCode = pdSVReadFile(vertexShader);
-    StringView fragShaderCode = pdSVReadFile(fragmentShader);
+    StringView vertShaderCode = pdSVReadFile("src/shaders/vertTest.vert");
+    StringView fragShaderCode = pdSVReadFile("src/shaders/fragTest.frag");
 
     VkShaderModule vertShaderModule = createShaderModule(engine, vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(engine, fragShaderCode);
@@ -51,129 +55,120 @@ void createGraphicsPipeline
 
     VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {0};
     dynamicStateCreateInfo.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicStateCreateInfo.pDynamicStates    = dynamicStates.data();
+    dynamicStateCreateInfo.dynamicStateCount = (u32)(pdArrSize(dynamicStates));
+    dynamicStateCreateInfo.pDynamicStates    = dynamicStates;
 
-    auto bindingDescription    = getVertexBindingDescription();
-    auto attributeDescriptions = getVertexAttributeDescriptions();
+    VkVertexInputBindingDescription   bindingDesc   = getVertexBindingDescription();
+    VkVertexInputAttributeDescription attributeDesc = getVertexAttributeDescriptions();
 
-    VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{};
-    vertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
-    vertexInputStateCreateInfo.pVertexBindingDescriptions = &bindingDescription;
-    vertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-    vertexInputStateCreateInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    VkPipelineVertexInputStateCreateInfo pipelineVISCI = {0};
+    pipelineVISCI.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    pipelineVISCI.vertexBindingDescriptionCount   = 1;
+    pipelineVISCI.pVertexBindingDescriptions      = &bindingDescription;
+    pipelineVISCI.vertexAttributeDescriptionCount = (u32)(pdArrSize(attributeDescriptions));
+    pipelineVISCI.pVertexAttributeDescriptions    = attributeDescriptions;
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo{};
-    inputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE;
+    VkPipelineInputAssemblyStateCreateInfo pipelineIASCI = {0};
+    pipelineIASCI.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    pipelineIASCI.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    pipelineIASCI.primitiveRestartEnable = VK_FALSE;
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = (float)engine.swapchainExtent.width;
-    viewport.height = (float)engine.swapchainExtent.height;
+    VkViewport viewport = {0};
+    viewport.x        = 0.0f;
+    viewport.y        = 0.0f;
+    viewport.width    = (float)engine->vkData->swapchainExtent.width;
+    viewport.height   = (float)engine->vkData->swapchainExtent.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = engine.swapchainExtent;
+    VkRect2D scissor = {0};
+    scissor.extent = engine->vkData->swapchainExtent;
 
-    VkPipelineViewportStateCreateInfo viewportStateCreateInfo{};
-    viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportStateCreateInfo.viewportCount = 1;
-    viewportStateCreateInfo.scissorCount = 1;
+    VkPipelineViewportStateCreateInfo viewportSCI = {0};
+    viewportSCI.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportSCI.viewportCount = 1;
+    viewportSCI.scissorCount  = 1;
 
-    VkPipelineRasterizationStateCreateInfo rasterizerStateCreateInfo{};
-    rasterizerStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizerStateCreateInfo.depthClampEnable = VK_FALSE;
-    rasterizerStateCreateInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizerStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizerStateCreateInfo.lineWidth = 1.0f;
-    rasterizerStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizerStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizerStateCreateInfo.depthBiasEnable = VK_FALSE;
-    rasterizerStateCreateInfo.depthBiasConstantFactor = 0.0f;
-    rasterizerStateCreateInfo.depthBiasClamp = 0.0f;
-    rasterizerStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+    VkPipelineRasterizationStateCreateInfo rasterizerSCI = {0};
+    rasterizerSCI.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizerSCI.depthClampEnable        = VK_FALSE;
+    rasterizerSCI.rasterizerDiscardEnable = VK_FALSE;
+    rasterizerSCI.polygonMode             = VK_POLYGON_MODE_FILL;
+    rasterizerSCI.lineWidth               = 1.0f;
+    rasterizerSCI.cullMode                = VK_CULL_MODE_BACK_BIT;
+    rasterizerSCI.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizerSCI.depthBiasEnable         = VK_FALSE;
+    rasterizerSCI.depthBiasConstantFactor = 0.0f;
+    rasterizerSCI.depthBiasClamp          = 0.0f;
+    rasterizerSCI.depthBiasSlopeFactor    = 0.0f;
 
-    VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo{};
-    multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
-    multisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampleStateCreateInfo.minSampleShading = 1.0f;
-    multisampleStateCreateInfo.pSampleMask = 0;
-    multisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
-    multisampleStateCreateInfo.alphaToOneEnable = VK_FALSE;
+    VkPipelineMultisampleStateCreateInfo multisampleSCI = {0};
+    multisampleSCI.sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampleSCI.sampleShadingEnable   = VK_FALSE;
+    multisampleSCI.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT;
+    multisampleSCI.minSampleShading      = 1.0f;
+    multisampleSCI.pSampleMask           = 0;
+    multisampleSCI.alphaToCoverageEnable = VK_FALSE;
+    multisampleSCI.alphaToOneEnable      = VK_FALSE;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachmentState{};
-    colorBlendAttachmentState.colorWriteMask =  VK_COLOR_COMPONENT_R_BIT |
-                                                VK_COLOR_COMPONENT_G_BIT |
-                                                VK_COLOR_COMPONENT_B_BIT |
-                                                VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachmentState.blendEnable = VK_FALSE;
+    VkPipelineColorBlendAttachmentState colorBlendAS = {0};
+    colorBlendAS.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAS.blendEnable    = VK_FALSE;
 
-    VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo{};
-    colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
-    colorBlendStateCreateInfo.attachmentCount = 1;
-    colorBlendStateCreateInfo.pAttachments = &colorBlendAttachmentState;
+    VkPipelineColorBlendStateCreateInfo colorBlendCI = {0};
+    colorBlendCI.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlendCI.logicOpEnable   = VK_FALSE;
+    colorBlendCI.attachmentCount = 1;
+    colorBlendCI.pAttachments    = &colorBlendAttachmentState;
 
-    VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfo{};
-    depthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
-    depthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
-    depthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
-    depthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE;
-    depthStencilStateCreateInfo.minDepthBounds = 0.0f;
-    depthStencilStateCreateInfo.maxDepthBounds = 1.0f;
-    depthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
-    depthStencilStateCreateInfo.front = {};
-    depthStencilStateCreateInfo.back = {};
+    VkPipelineDepthStencilStateCreateInfo depthStencilSCI = {0};
+    depthStencilSCI.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilSCI.depthTestEnable       = VK_TRUE;
+    depthStencilSCI.depthWriteEnable      = VK_TRUE;
+    depthStencilSCI.depthCompareOp        = VK_COMPARE_OP_LESS;
+    depthStencilSCI.depthBoundsTestEnable = VK_FALSE;
+    depthStencilSCI.minDepthBounds        = 0.0f;
+    depthStencilSCI.maxDepthBounds        = 1.0f;
+    depthStencilSCI.stencilTestEnable     = VK_FALSE;
+    depthStencilSCI.front                 = = {0};
+    depthStencilSCI.back                  = = {0};
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{};
-    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutCreateInfo.setLayoutCount = 1;
-    pipelineLayoutCreateInfo.pSetLayouts = &engine.descriptorSetLayout;
+    VkPipelineLayoutCreateInfo piplelineLayoutCI = {0};
+    piplelineLayoutCI.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    piplelineLayoutCI.setLayoutCount = 1;
+    piplelineLayoutCI.pSetLayouts    = &engine.descriptorSetLayout;
 
-    VkResult result = vkCreatePipelineLayout(engine.logicalDevice,
-                                             &pipelineLayoutCreateInfo,
-                                             0,
-                                             &engine.graphicsPipelineLayout);
+    VkResult result = vkCreatePipelineLayout(engine.logicalDevice, &piplelineLayoutCI,
+                                             0, &engine.graphicsPipelineLayout);
 
     RIV_ASSERT_VK_SUCCESS(result, "failed to create pipeline layout!");
 
-    VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo{};
-    graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    graphicsPipelineCreateInfo.stageCount = 2;
-    graphicsPipelineCreateInfo.pStages = shaderStages;
+    VkGraphicsPipelineCreateInfo graphicsCI = {0};
+    graphicsCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    graphicsCI.stageCount          = 2;
+    graphicsCI.pStages             = shaderStages;
 
-    graphicsPipelineCreateInfo.pVertexInputState = &vertexInputStateCreateInfo;
-    graphicsPipelineCreateInfo.pInputAssemblyState = &inputAssemblyStateCreateInfo;
-    graphicsPipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-    graphicsPipelineCreateInfo.pRasterizationState = &rasterizerStateCreateInfo;
-    graphicsPipelineCreateInfo.pMultisampleState = &multisampleStateCreateInfo;
-    graphicsPipelineCreateInfo.pDepthStencilState = &depthStencilStateCreateInfo;
-    graphicsPipelineCreateInfo.pColorBlendState = &colorBlendStateCreateInfo;
-    graphicsPipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
+    graphicsCI.pVertexInputState   = &vertexInputStateCreateInfo;
+    graphicsCI.pInputAssemblyState = &inputAssemblyStateCreateInfo;
+    graphicsCI.pViewportState      = &viewportStateCreateInfo;
+    graphicsCI.pRasterizationState = &rasterizerStateCreateInfo;
+    graphicsCI.pMultisampleState   = &multisampleStateCreateInfo;
+    graphicsCI.pDepthStencilState  = &depthStencilStateCreateInfo;
+    graphicsCI.pColorBlendState    = &colorBlendStateCreateInfo;
+    graphicsCI.pDynamicState       = &dynamicStateCreateInfo;
 
-    graphicsPipelineCreateInfo.layout = engine.graphicsPipelineLayout;
-    graphicsPipelineCreateInfo.renderPass = engine.renderPass;
-    graphicsPipelineCreateInfo.subpass = 0;
+    graphicsCI.layout              = engine.graphicsPipelineLayout;
+    graphicsCI.renderPass          = engine.renderPass;
+    graphicsCI.subpass             = 0;
 
-    result = vkCreateGraphicsPipelines(engine.logicalDevice,
-                                       VK_NULL_HANDLE,
-                                       1,
-                                       &graphicsPipelineCreateInfo,
-                                       0,
-                                       &engine.graphicsPipeline);
+    result = vkCreateGraphicsPipelines(engine.logicalDevice, VK_NULL_HANDLE, 1,
+                                       &graphicsCI, 0, &engine.graphicsPipeline);
 
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create graphics pipeline!");
+    RV_ASSERT(result == VK_SUCCESS, "failed to create graphics pipeline!");
 
-    vkDestroyShaderModule(engine.logicalDevice, vertShaderModule, 0);
-    vkDestroyShaderModule(engine.logicalDevice, fragShaderModule, 0);
+    vkDestroyShaderModule(engine->vkData->logicalDevice, vertShaderModule, 0);
+    vkDestroyShaderModule(engine->vkData->logicalDevice, fragShaderModule, 0);
 }
 
 void createFramebuffers
@@ -210,28 +205,28 @@ void createFramebuffers
 
 void recordCommandBuffer
 (
-    const EngineData        &engine,
-    const VkCommandBuffer   &commandBuffer,
-    const uint32_t          &imageIndex
+    const EngineData      *engine,
+    const VkCommandBuffer *commandBuffer,
+    const uint32_t        *imageIndex
 ){
-    VkCommandBufferBeginInfo beginInfo{};
+    VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
     VkResult result = vkBeginCommandBuffer(commandBuffer, &beginInfo);
     RIV_ASSERT_VK_SUCCESS(result, "failed to begin recording command buffer!");
 
-    std::array<VkClearValue, 2> clearValues{};
+    std::array<VkClearValue, 2> clearValues = {0};
     clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = engine.renderPass;
-    renderPassInfo.framebuffer = engine.swapchainFramebuffers[imageIndex];
+    VkRenderPassBeginInfo renderPassInfo = {0};
+    renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass        = engine.renderPass;
+    renderPassInfo.framebuffer       = engine.swapchainFramebuffers[imageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = engine.swapchainExtent;
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    renderPassInfo.clearValueCount   = (u32)(clearValues.size());
+    renderPassInfo.pClearValues      = clearValues.data();
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -246,30 +241,25 @@ void recordCommandBuffer
 
     vkCmdBindIndexBuffer(commandBuffer, engine.vertexBuffer, engine.vertSize, VK_INDEX_TYPE_UINT32);
 
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(engine.swapchainExtent.width);
-    viewport.height = static_cast<float>(engine.swapchainExtent.height);
+    VkViewport viewport = {0};
+    viewport.x        = 0.0f;
+    viewport.y        = 0.0f;
+    viewport.width    = (f32)(engine->vkData->swapchainExtent.width);
+    viewport.height   = (f32)(engine->vkData->swapchainExtent.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-    VkRect2D scissor{};
+    VkRect2D scissor = {0};
     scissor.offset = {0, 0};
     scissor.extent = engine.swapchainExtent;
 
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdBindDescriptorSets(commandBuffer,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            engine.graphicsPipelineLayout,
-                            0,
-                            1,
-                            &engine.descriptorSets[currentFrame],
-                            0,
-                            0);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            engine->vkData->graphicsPipelineLayout, 0, 1,
+                            &engine.descriptorSets[currentFrame], 0, 0);
 
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(engine.vertexIndices.size()), 1, 0, 0, 0);
 
@@ -281,41 +271,43 @@ void recordCommandBuffer
 
 void createCommandPools
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    VkCommandPoolCreateInfo graphicsPoolInfo{};
-    graphicsPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    graphicsPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VkCommandPoolCreateInfo graphicsPoolInfo = {0};
+    graphicsPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    graphicsPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     graphicsPoolInfo.queueFamilyIndex = engine.logicalQueueFamilies.graphicsIndex;
 
     VkResult result = vkCreateCommandPool(engine.logicalDevice, &graphicsPoolInfo, 0, &engine.graphicsCommandPool);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create graphics command pool!");
 
-    VkCommandPoolCreateInfo transferPoolInfo{};
-    transferPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    transferPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VkCommandPoolCreateInfo transferPoolInfo = {0};
+    transferPoolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    transferPoolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     transferPoolInfo.queueFamilyIndex = engine.logicalQueueFamilies.transferIndex;
 
-    result = vkCreateCommandPool(engine.logicalDevice, &transferPoolInfo, 0, &engine.transferCommandPool);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create transfer command pool!");
+    result = vkCreateCommandPool(engine.logicalDevice, &transferPoolInfo, 0,
+                                 &engine.transferCommandPool);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create transfer command pool!");
 }
 
 VkCommandBuffer setupCommandBuffer
 (
-    const EngineData    &engine,
-    VkCommandPool       &commandPool
+    const EngineData *engine,
+    VkCommandPool    *commandPool
 ){
-    VkCommandBufferAllocateInfo commandbufAllocInfo{};
-    commandbufAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandbufAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandbufAllocInfo.commandPool = commandPool;
+    VkCommandBufferAllocateInfo commandbufAllocInfo = {0};
+    commandbufAllocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandbufAllocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    commandbufAllocInfo.commandPool        = commandPool;
     commandbufAllocInfo.commandBufferCount = 1;
 
-    VkCommandBuffer commandBuffer;
-    VkResult result = vkAllocateCommandBuffers(engine.logicalDevice, &commandbufAllocInfo, &commandBuffer);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to allocate single time command buffer!");
+    VkCommandBuffer commandBuffer = {0};
+    VkResult result = vkAllocateCommandBuffers(engine.logicalDevice,
+                                               &commandbufAllocInfo, &commandBuffer);
+    RV_ASSERT(result == VK_SUCCESS, "failed to allocate single time command buffer!");
 
-    VkCommandBufferBeginInfo commandbufBeginInfo{};
+    VkCommandBufferBeginInfo commandbufBeginInfo = {0};
     commandbufBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     commandbufBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
@@ -326,24 +318,24 @@ VkCommandBuffer setupCommandBuffer
 
 void flushCommandBuffer
 (
-    const EngineData        &engine,
-    const VkCommandBuffer   &commandBuffer,
-    const VkCommandPool     &commandPool,
-    const VkQueue           &queue
+    const EngineData      *engine,
+    const VkCommandBuffer *commandBuffer,
+    const VkCommandPool   *commandPool,
+    const VkQueue         *queue
 ){
     vkEndCommandBuffer(commandBuffer);
 
-    VkSubmitInfo singleTimeSubmitInfo{};
-    singleTimeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSubmitInfo singleTimeSubmitInfo = {0};
+    singleTimeSubmitInfo.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     singleTimeSubmitInfo.commandBufferCount = 1;
-    singleTimeSubmitInfo.pCommandBuffers = &commandBuffer;
+    singleTimeSubmitInfo.pCommandBuffers    = &commandBuffer;
 
-    VkFence queueFence;
-    VkFenceCreateInfo fenceCreateInfo{};
+    VkFence queueFence = 0;
+    VkFenceCreateInfo fenceCreateInfo = {0};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 
     VkResult result = vkCreateFence(engine.logicalDevice, &fenceCreateInfo, 0, &queueFence);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create queue fence!");
+    RV_ASSERT(result == VK_SUCCESS, "failed to create queue fence!");
 
     vkQueueSubmit(queue, 1, &singleTimeSubmitInfo, queueFence);
 
@@ -355,84 +347,90 @@ void flushCommandBuffer
 
 void createCommandBuffers
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    engine.commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    engine->vkData->commandBuffers.reserve(MAX_FRAMES_IN_FLIGHT);
 
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = engine.graphicsCommandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = static_cast<uint32_t>(engine.commandBuffers.size());
+    VkCommandBufferAllocateInfo allocInfo = {0};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool        = engine.graphicsCommandPool;
+    allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = (u32)(pdArrSize(engine.commandBuffers);
 
-    VkResult result = vkAllocateCommandBuffers(engine.logicalDevice, &allocInfo, engine.commandBuffers.data());
-    RIV_ASSERT_VK_SUCCESS(result, "failed to allocate command buffers!");
+    VkResult result = vkAllocateCommandBuffers(engine.logicalDevice, &allocInfo,
+                                               engine.commandBuffers);
+    RV_ASSERT(result == VK_SUCCESS, "failed to allocate command buffers!");
 }
 
 void cleanupSyncObjects
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    for(size_t i = 0; i < engine.swapchainImages.size(); ++i)
+    for(u64 i = 0; i < pdArrSize(engine.swapchainImages); ++i)
     {
         vkDestroySemaphore(engine.logicalDevice, engine.imageReadyForWriteSemaphores[i], 0);
         engine.imageReadyForWriteSemaphores[i] = VK_NULL_HANDLE;
-        riverLog(std::format("destroyed imageReadyForWriteSemaphore No. {}.", i), RIV_LOG_LEVEL_TRACE);
+        RV_TRACE("destroyed imageReadyForWriteSemaphore No. %"PRIu64, i);
 
         vkDestroySemaphore(engine.logicalDevice, engine.imageReadyForPresentSemaphores[i], 0);
         engine.imageReadyForPresentSemaphores[i] = VK_NULL_HANDLE;
-        riverLog(std::format("destroyed imageReadyForPresentSemaphore No. {}.", i), RIV_LOG_LEVEL_TRACE);
+        riverLog("destroyed imageReadyForPresentSemaphore No. %"PRIu64, i);
 
         vkDestroyFence(engine.logicalDevice, engine.inFlightFences[i], 0);
         engine.inFlightFences[i] = VK_NULL_HANDLE;
-        riverLog(std::format("destroyed inFlightFence No. {}", i), RIV_LOG_LEVEL_TRACE);
+        riverLog("destroyed inFlightFence No. %"PRIu64, i);
     }
-    vkDestroySemaphore(engine.logicalDevice, engine.acquireSemaphore, 0);
+
+    vkDestroySemaphore(engine->vkData->logicalDevice, engine->vkData->acquireSemaphore,
+                       0);
     engine.acquireSemaphore = VK_NULL_HANDLE;
-    riverLog("destroyed acquireSemaphore.", RIV_LOG_LEVEL_TRACE);
+    RV_TRACE("destroyed acquireSemaphore.");
 }
 
 void createSyncObjects
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    engine.imageReadyForWriteSemaphores.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
-    engine.imageReadyForPresentSemaphores.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
-    engine.inFlightFences.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
+    // TODO: make these dynamic arrays and set the null handles manually
+    engine->vkData->imageReadyForWriteSemaphores.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
+    engine->vkData->imageReadyForPresentSemaphores.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
+    engine->vkData->inFlightFences.resize(engine.swapchainImages.size(), VK_NULL_HANDLE);
 
-    VkSemaphoreCreateInfo semaphoreInfo{};
+    VkSemaphoreCreateInfo semaphoreInfo = {0};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VkFenceCreateInfo fenceInfo{};
+    VkFenceCreateInfo fenceInfo = {0};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    VkResult result = vkCreateSemaphore(engine.logicalDevice, &semaphoreInfo, 0, &engine.acquireSemaphore);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create acquireSemaphore.");
+    VkResult result = vkCreateSemaphore(engine->vkData->logicalDevice,
+                                        &semaphoreInfo, 0, &engine.acquireSemaphore);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create acquireSemaphore.");
 
-    for(size_t i = 0; i < engine.swapchainImages.size(); ++i)
+    for(u64 i = 0; i < pdArrSize(engine->vkData->swapchainImages); ++i)
     {
-        VkResult result = vkCreateSemaphore(engine.logicalDevice,
-                                            &semaphoreInfo,
-                                            0,
-                                            &engine.imageReadyForPresentSemaphores[i]);
+        VkResult result = vkCreateSemaphore(engine->vkData->logicalDevice,
+                                            &semaphoreInfo, 0,
+                                            &engine->vkData->imageReadyForPresentSemaphores[i]);
 
-        RIV_ASSERT_VK_SUCCESS(result, std::format("failed to create imageReadyForPresentSemaphore No. {}", i));
+        RV_ASSERT(result == VK_SUCCESS,
+                  "failed to create imageReadyForPresentSemaphore No. %" PRIu64, i);
 
-        if(engine.imageReadyForWriteSemaphores[i] == VK_NULL_HANDLE)
+        if(engine->vkData->imageReadyForWriteSemaphores[i] == VK_NULL_HANDLE)
         {
             VkResult result = vkCreateSemaphore(engine.logicalDevice,
                                                 &semaphoreInfo,
                                                 0,
                                                 &engine.imageReadyForWriteSemaphores[i]);
 
-            RIV_ASSERT_VK_SUCCESS(result, std::format("failed to create imageReadyForWriteSemaphore No. {}", i));
+            RV_ASSERT(result, "failed to create imageReadyForWriteSemaphore No. %"
+                      PRIu64, i);
         }
 
         if(engine.inFlightFences[i] == VK_NULL_HANDLE)
         {
             VkResult result = vkCreateFence(engine.logicalDevice, &fenceInfo, 0, &engine.inFlightFences[i]);
-            RIV_ASSERT_VK_SUCCESS(result, std::format("failed to create inFlightFence No. {}", i));
+            RV_ASSERT(result == VK_SUCCESS, "failed to create inFlightFence No. %"PRIu64, i);
         }
     }
 }
@@ -441,19 +439,19 @@ void createDescriptorSetLayout
 (
     EngineData &engine
 ){
-    VkDescriptorSetLayoutBinding uniformBufferLayoutBinding{};
-    uniformBufferLayoutBinding.binding = 0;
-    uniformBufferLayoutBinding.descriptorCount = 1;
-    uniformBufferLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    VkDescriptorSetLayoutBinding uniformBufferLayoutBinding = {0};
+    uniformBufferLayoutBinding.binding            = 0;
+    uniformBufferLayoutBinding.descriptorCount    = 1;
+    uniformBufferLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uniformBufferLayoutBinding.pImmutableSamplers = 0;
-    uniformBufferLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uniformBufferLayoutBinding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutBinding textureSamplerLayoutBinding{};
-    textureSamplerLayoutBinding.binding = 1;
-    textureSamplerLayoutBinding.descriptorCount = 1;
-    textureSamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    VkDescriptorSetLayoutBinding textureSamplerLayoutBinding = {0};
+    textureSamplerLayoutBinding.binding            = 1;
+    textureSamplerLayoutBinding.descriptorCount    = 1;
+    textureSamplerLayoutBinding.descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     textureSamplerLayoutBinding.pImmutableSamplers = 0;
-    textureSamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    textureSamplerLayoutBinding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     std::array<VkDescriptorSetLayoutBinding, 2> bindings =
     {
@@ -461,14 +459,12 @@ void createDescriptorSetLayout
         textureSamplerLayoutBinding
     };
 
-    VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo{};
-    descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-    descriptorSetLayoutCreateInfo.pBindings = bindings.data();
+    VkDescriptorSetLayoutCreateInfo dscLCI = {0};
+    dscLCI.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    dscLCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    dscLCI.pBindings    = bindings.data();
 
-    VkResult result = vkCreateDescriptorSetLayout(engine.logicalDevice,
-                                                  &descriptorSetLayoutCreateInfo,
-                                                  0,
+    VkResult result = vkCreateDescriptorSetLayout(engine.logicalDevice, &dscLCI, 0,
                                                   &engine.descriptorSetLayout);
 
     RIV_ASSERT_VK_SUCCESS(result, "failed to create descriptor set layout!");
@@ -478,21 +474,23 @@ void createDescriptorPool
 (
     EngineData &engine
 ){
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    VkDescriptorPoolSize poolSizes[2] = {0};
+    poolSizes[0].type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = (u32)(MAX_FRAMES_IN_FLIGHT);
+    poolSizes[1].type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = (u32)(MAX_FRAMES_IN_FLIGHT);
 
-    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo{};
-    descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {0};
+    descriptorPoolCreateInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    descriptorPoolCreateInfo.pPoolSizes = poolSizes.data();
-    descriptorPoolCreateInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    descriptorPoolCreateInfo.flags = 0;
+    descriptorPoolCreateInfo.pPoolSizes    = poolSizes.data();
+    descriptorPoolCreateInfo.maxSets       = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    descriptorPoolCreateInfo.flags         = 0;
 
-    VkResult result = vkCreateDescriptorPool(engine.logicalDevice, &descriptorPoolCreateInfo, 0, &engine.descriptorPool);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create descriptor pool.");
+    VkResult result = vkCreateDescriptorPool(engine->vkData->logicalDevice,
+                                             &descriptorPoolCreateInfo, 0,
+                                             &engine->vkData->descriptorPool);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create descriptor pool.");
 }
 
 void createDescriptorSets

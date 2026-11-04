@@ -103,8 +103,8 @@ void transitionImageLayout
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, 0, 0, 0, 1,
                          &barrier);
 
-    flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool,
-                       engine.graphicsQueue);
+    flushCommandBuffer(engine, commandBuffer, engine->vkData->graphicsCommandPool,
+                       engine->vkData->graphicsQueue);
 }
 
 f_internal void generateMipmaps
@@ -115,58 +115,56 @@ f_internal void generateMipmaps
     const i32     *texWidth,
     const i32     *texHeight
 ){
-    VkCommandBuffer commandBuffer = setupCommandBuffer(engine, engine.graphicsCommandPool);
+    VkCommandBuffer commandBuffer =
+        setupCommandBuffer(engine, engine->vkData->graphicsCommandPool);
 
-    VkImageMemoryBarrier imageMemoryBarrier{};
-    imageMemoryBarrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.image                           = image;
-    imageMemoryBarrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageMemoryBarrier.subresourceRange.baseArrayLayer = 0;
-    imageMemoryBarrier.subresourceRange.layerCount     = 1;
-    imageMemoryBarrier.subresourceRange.levelCount     = 1;
+    VkImageMemoryBarrier imgMB = {0};
+    imgMB.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imgMB.image                           = image;
+    imgMB.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    imgMB.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    imgMB.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    imgMB.subresourceRange.baseArrayLayer = 0;
+    imgMB.subresourceRange.layerCount     = 1;
+    imgMB.subresourceRange.levelCount     = 1;
 
-    i32 mipWidth = texWidth;
+    i32 mipWidth  = texWidth;
     i32 mipHeight = texHeight;
 
     for(u32 i = 1; i < mipLevels; ++i)
     {
-        imageMemoryBarrier.subresourceRange.baseMipLevel = i - 1;
-        imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        imgMB.subresourceRange.baseMipLevel = i - 1;
+        imgMB.oldLayout                     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        imgMB.newLayout                     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        imgMB.srcAccessMask                 = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imgMB.dstAccessMask                 = VK_ACCESS_TRANSFER_READ_BIT;
 
-        vkCmdPipelineBarrier(commandBuffer,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             0, 0, 0, 0, 0,
-                             1, &imageMemoryBarrier);
+        vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, 0, 0, 0, 1, &imgMB);
 
-        VkImageBlit imageBlit{};
-        imageBlit.srcOffsets[0] = {0, 0, 0};
-        imageBlit.srcOffsets[1] =
+        VkImageBlit imageBlit = {0};
+        imageBlit.srcOffsets[0]                 = {0, 0, 0};
+        imageBlit.srcOffsets[1]                 =
         {
             mipWidth,
             mipHeight,
             1
         };
-        imageBlit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBlit.srcSubresource.mipLevel = i - 1;
+        imageBlit.srcSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlit.srcSubresource.mipLevel       = i - 1;
         imageBlit.srcSubresource.baseArrayLayer = 0;
-        imageBlit.srcSubresource.layerCount = 1;
-        imageBlit.dstOffsets[0] = {0, 0, 0};
-        imageBlit.dstOffsets[1] =
+        imageBlit.srcSubresource.layerCount     = 1;
+        imageBlit.dstOffsets[0]                 = {0, 0, 0};
+        imageBlit.dstOffsets[1]                 =
         {
             mipWidth  > 1 ? mipWidth  / 2 : 1,
             mipHeight > 1 ? mipHeight / 2 : 1,
             1
         };
-        imageBlit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        imageBlit.dstSubresource.mipLevel = i;
+        imageBlit.dstSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        imageBlit.dstSubresource.mipLevel       = i;
         imageBlit.dstSubresource.baseArrayLayer = 0;
-        imageBlit.dstSubresource.layerCount = 1;
+        imageBlit.dstSubresource.layerCount     = 1;
 
         vkCmdBlitImage(commandBuffer,
                        image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -174,16 +172,16 @@ f_internal void generateMipmaps
                        1, &imageBlit,
                        VK_FILTER_LINEAR);
 
-        imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        imgMB.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        imgMB.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imgMB.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        imgMB.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
         vkCmdPipelineBarrier(commandBuffer,
                              VK_PIPELINE_STAGE_TRANSFER_BIT,
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                              0, 0, 0, 0, 0,
-                             1, &imageMemoryBarrier);
+                             1, &imgMB);
 
         if(mipWidth > 1)
         {
@@ -196,11 +194,11 @@ f_internal void generateMipmaps
         }
     }
 
-    imageMemoryBarrier.subresourceRange.baseMipLevel = mipLevels - 1;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imgMB.subresourceRange.baseMipLevel = mipLevels - 1;
+    imgMB.oldLayout                     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imgMB.newLayout                     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imgMB.srcAccessMask                 = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imgMB.dstAccessMask                 = VK_ACCESS_SHADER_READ_BIT;
 
     vkCmdPipelineBarrier(commandBuffer,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -208,7 +206,8 @@ f_internal void generateMipmaps
                          0, 0, 0, 0, 0,
                          1, &imageMemoryBarrier);
 
-    flushCommandBuffer(engine, commandBuffer, engine.graphicsCommandPool, engine.graphicsQueue);
+    flushCommandBuffer(engine, commandBuffer, engine->vkData->graphicsCommandPool,
+                       engine->vkData->graphicsQueue);
 }
 
 void createTextureImage
@@ -226,7 +225,7 @@ void createTextureImage
         RV_ERROR("failed to load texture image '"PRI_SV"'.", PRI_SV(path));
     }
 
-    engine.mipLevels = static_cast<u32>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+    engine.mipLevels = (u32)(floor(log2(max(texWidth, texHeight)))) + 1;
 
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
@@ -246,7 +245,7 @@ void createTextureImage
 
     void *data = 0;
     vkMapMemory(engine.logicalDevice, stagingBufferMemory, 0, imageSize, 0, &data);
-    memcpy(data, pixels, static_cast<size_t>(imageSize));
+    memcpy(data, pixels, (size)(imageSize));
     vkUnmapMemory(engine.logicalDevice, stagingBufferMemory);
 
     free(pixels);
@@ -263,53 +262,52 @@ void createTextureImage
                           VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-    copyBufferToImage(engine, stagingBuffer, engine.textureImage,
-                      (u32)(texWidth), (u32)(texHeight));
+    copyBufferToImage(engine, stagingBuffer, engine.textureImage, (u32)(texWidth),
+                      (u32)(texHeight));
 
-    generateMipmaps(engine, engine.textureImage, engine.mipLevels,
-                    (i32)(texWidth), (i32)(texHeight));
+    generateMipmaps(engine, engine.textureImage, engine.mipLevels, (i32)(texWidth),
+                    (i32)(texHeight));
 
     vkDestroyBuffer(engine.logicalDevice, stagingBuffer, 0);
     vkFreeMemory(engine.logicalDevice, stagingBufferMemory, 0);
 
-    engine.textureImageView =   createImageView(engine,
-                                                engine.textureImage,
-                                                engine.mipLevels,
-                                                VK_FORMAT_R8G8B8A8_SRGB,
-                                                VK_IMAGE_ASPECT_COLOR_BIT);
+    engine.textureImageView = createImageView(engine, engine.textureImage,
+                                              engine.mipLevels, VK_FORMAT_R8G8B8A8_SRGB,
+                                              VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 void createImage
 (
-    const EngineData            &engine,
-    const u32              &width,
-    const u32              &height,
-    const u32              &mipLevels,
-    const VkFormat              &format,
-    const VkImageTiling         &tiling,
-    const VkImageUsageFlags     &usage,
-    const VkMemoryPropertyFlags &memPropFlags,
-    VkImage                     &image,
-    VkDeviceMemory              &imageMem
+    const EngineData            *engine,
+    const u32                   *width,
+    const u32                   *height,
+    const u32                   *mipLevels,
+    const VkFormat              *format,
+    const VkImageTiling         *tiling,
+    const VkImageUsageFlags     *usage,
+    const VkMemoryPropertyFlags *memPropFlags,
+    VkImage                     *image,
+    VkDeviceMemory              *imageMem
 ){
-    VkImageCreateInfo imageCreateInfo{};
-    imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageCreateInfo.extent.width = width;
+    VkImageCreateInfo imageCreateInfo = {0};
+    imageCreateInfo.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageCreateInfo.imageType     = VK_IMAGE_TYPE_2D;
+    imageCreateInfo.extent.width  = width;
     imageCreateInfo.extent.height = height;
-    imageCreateInfo.extent.depth = 1;
-    imageCreateInfo.mipLevels = mipLevels;
-    imageCreateInfo.arrayLayers = 1;
+    imageCreateInfo.extent.depth  = 1;
+    imageCreateInfo.mipLevels     = mipLevels;
+    imageCreateInfo.arrayLayers   = 1;
 
-    //in an edge case, this format might not be supported. conversions will be done eventually
-    imageCreateInfo.format = format;
-    imageCreateInfo.tiling = tiling;
+    // in an edge case, this format might not be supported.
+    // conversions will be done eventually
+    imageCreateInfo.format        = format;
+    imageCreateInfo.tiling        = tiling;
     imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageCreateInfo.usage = usage;
-    imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageCreateInfo.usage         = usage;
+    imageCreateInfo.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
 
-    imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageCreateInfo.flags = 0;
+    imageCreateInfo.samples       = VK_SAMPLE_COUNT_1_BIT;
+    imageCreateInfo.flags         = 0;
 
     VkResult result = vkCreateImage(engine.logicalDevice, &imageCreateInfo, 0, &image);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create image!");
@@ -317,7 +315,7 @@ void createImage
     VkMemoryRequirements imageMemRequirements;
     vkGetImageMemoryRequirements(engine.logicalDevice, image, &imageMemRequirements);
 
-    VkMemoryAllocateInfo mAllocInfo{};
+    VkMemoryAllocateInfo mAllocInfo = {0};
     mAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     mAllocInfo.allocationSize = imageMemRequirements.size;
     mAllocInfo.memoryTypeIndex = findSuitableMemoryType(engine, imageMemRequirements.memoryTypeBits, memPropFlags);
@@ -357,26 +355,26 @@ VkImageView createImageView
 
 void createTextureSampler
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    VkSamplerCreateInfo samplerCreateInfo{};
-    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-    samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-    samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerCreateInfo.anisotropyEnable = VK_TRUE;
-    samplerCreateInfo.maxAnisotropy = engine.deviceProperties.limits.maxSamplerAnisotropy;
-    samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+    VkSamplerCreateInfo samplerCreateInfo = {0};
+    samplerCreateInfo.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerCreateInfo.magFilter               = VK_FILTER_LINEAR;
+    samplerCreateInfo.minFilter               = VK_FILTER_LINEAR;
+    samplerCreateInfo.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerCreateInfo.anisotropyEnable        = VK_TRUE;
+    samplerCreateInfo.maxAnisotropy           = engine.deviceProperties.limits.maxSamplerAnisotropy;
+    samplerCreateInfo.borderColor             = VK_BORDER_COLOR_INT_OPAQUE_WHITE;
     samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerCreateInfo.compareEnable = VK_FALSE;
-    samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerCreateInfo.mipLodBias = 0.0f;
-    samplerCreateInfo.minLod = 0.0f;
-    samplerCreateInfo.maxLod = static_cast<float>(engine.mipLevels);
+    samplerCreateInfo.compareEnable           = VK_FALSE;
+    samplerCreateInfo.compareOp               = VK_COMPARE_OP_ALWAYS;
+    samplerCreateInfo.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerCreateInfo.mipLodBias              = 0.0f;
+    samplerCreateInfo.minLod                  = 0.0f;
+    samplerCreateInfo.maxLod                  = engine.mipLevels;
 
     VkResult result = vkCreateSampler(engine.logicalDevice, &samplerCreateInfo, 0, &engine.textureSampler);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create texture sampler!");
+    RV_ASSERT(result, "failed to create texture sampler!");
 }

@@ -234,21 +234,22 @@ void rvCreateFramebuffers
 (
     void
 ){
-    swapChainFramebuffers.resize(swapChainImageViews.size());
+    swapchainFramebuffers.reserve(swapchainImageViews.size());
 
-    for(size_t i = 0; i < swapChainImageViews.size(); ++i){
-        VkImageView attachments[] = { swapChainImageViews[i] };
+    for(size_t i = 0; i < swapchainImageViews.size(); ++i)
+    {
+        VkImageView attachments[] = { swapchainImageViews[i] };
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass      = pipeline::renderPass;
         framebufferInfo.attachmentCount = 1;
         framebufferInfo.pAttachments    = attachments;
-        framebufferInfo.width           = swapChainExtent.width;
-        framebufferInfo.height          = swapChainExtent.height;
+        framebufferInfo.width           = swapchainExtent.width;
+        framebufferInfo.height          = swapchainExtent.height;
         framebufferInfo.layers          = 1;
 
-        if(vkCreateFramebuffer(device::logicalDevice, &framebufferInfo, 0, &swapChainFramebuffers[i]) != VK_SUCCESS)
+        if(vkCreateFramebuffer(device::logicalDevice, &framebufferInfo, 0, &swapchainFramebuffers[i]) != VK_SUCCESS)
         {
             RV_ERROR("failed to create framebuffer!");
         }
@@ -271,11 +272,13 @@ void rvCreateCommandPool
     poolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
 
-    if((vkCreateCommandPool(device::logicalDevice, &poolInfo, 0, &pipeline::commandPool)) != VK_SUCCESS){
-        RV_DEBUG("\nERROR: failed to create command pool!", 2, 1);
-        throw std::runtime_error("failed to create command pool!");
-    }else{
-        RV_DEBUG("Successfully created command pool.", 0, 1);
+    if((vkCreateCommandPool(device::logicalDevice, &poolInfo, 0, &pipeline::commandPool)) != VK_SUCCESS)
+    {
+        RV_ERROR("failed to create command pool!");
+    }
+    else
+    {
+        RV_DEBUG("Successfully created command pool.");
     }
 }
 
@@ -327,7 +330,7 @@ void rvRecordCommandBuffer
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       pipeline::graphicsPipeline);
 
-    VkViewport viewport{};
+    VkViewport viewport {0};
     viewport.x        = 0.0f;
     viewport.y        = 0.0f;
     viewport.width    = (float)(swapChainExtent.width);
@@ -337,7 +340,7 @@ void rvRecordCommandBuffer
 
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-    VkRect2D scissor{};
+    VkRect2D scissor = {0};
     scissor.offset = {0, 0};
     scissor.extent = swapChainExtent;
 
@@ -365,7 +368,9 @@ void rvCreateSyncObjects
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if((vkCreateSemaphore(device::logicalDevice, &semaphoreInfo, 0, &pipeline::imageAvailableSemaphore)) != VK_SUCCESS || (vkCreateSemaphore(device::logicalDevice, &semaphoreInfo, 0, &pipeline::renderFinishedSemaphore)) != VK_SUCCESS){
+    if((vkCreateSemaphore(logicalDevice, &semaphoreInfo, 0, &imageAvailableSemaphore)) != VK_SUCCESS ||
+       (vkCreateSemaphore(logicalDevice, &semaphoreInfo, 0, &renderFinishedSemaphore)) != VK_SUCCESS)
+    {
         RV_ERROR("\nERROR: failed to create semaphores!");
     }
     else
@@ -375,11 +380,10 @@ void rvCreateSyncObjects
 
     if((vkCreateFence(device::logicalDevice, &fenceInfo, 0, &pipeline::inFlightFence)) != VK_SUCCESS)
     {
-        RV_DEBUG("\nERROR: failed to create fence!");
-        throw std::runtime_error("failed to create fence!");
+        RV_ERROR("failed to create fence!");
     }
     else
     {
-        RV_DEBUG("Successfully created fence.", 0, 1);
+        RV_DEBUG("Successfully created fence.");
     }
 }

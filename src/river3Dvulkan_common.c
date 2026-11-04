@@ -424,7 +424,7 @@ void drawFrame
 
     VkSwapchainKHR swapchains[] =
     {
-        engine.swapchain
+        engine->vkData->swapchain
     };
 
     VkPresentInfoKHR presentInfo{};
