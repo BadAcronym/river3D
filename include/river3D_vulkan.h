@@ -1,4 +1,8 @@
-#pramga once
+#ifndef RV3D_VULKAN_H
+#define RV3D_VULKAN_H
+
+typedef PFN_vkCreateDebugUtilsMessengerEXT  vkCreateMsgr;
+typedef PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyMsgr;
 
 extern void createSurface
 (
@@ -217,3 +221,5 @@ extern void cleanupSwapchain
 (
     const EngineData *engine
 );
+
+#endif

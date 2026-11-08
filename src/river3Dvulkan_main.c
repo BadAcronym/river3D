@@ -21,8 +21,7 @@ f_internal VkResult CreateDebugUtilsMessengerEXT
     const VkAllocationCallbacks              *pAllocator,
     VkDebugUtilsMessengerEXT                 *pDebugMessenger
 ){
-
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    vkCreateMsgr func = (vkCreateMsgr)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if(func)
     {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);

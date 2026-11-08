@@ -1,5 +1,5 @@
-#ifndef RIVER2D_PRINT_MACROS
-#define RIVER2D_PRINT_MACROS
+#ifndef RV3D_PRINT_MACROS
+#define RV3D_PRINT_MACROS
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef RV3D_MAIN_H
+#define RV3D_MAIN_H
 
 #include "pd_string_view.h"
 
@@ -136,8 +137,8 @@ typedef struct VulkanData
     VkQueue                          graphicsQueue;
     VkQueue                          presentQueue;
     VkQueue                          transferQueue;
-    VkSemaphore                      *imageReadyForWriteSemaphores;
-    VkSemaphore                      *imageReadyForPresentSemaphores;
+    VkSemaphore                      *iRWSemaphores;
+    VkSemaphore                      *iRPSemaphores;
     VkSemaphore                      acquireSemaphore;
     VkFence                          *inFlightFences;
     Vertex                           *vertices;
@@ -251,3 +252,5 @@ extern void riverLog
     const StringView text,
     const u08        level
 );
+
+#endif
