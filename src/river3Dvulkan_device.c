@@ -1,5 +1,8 @@
 #include "river3D_main.h"
+#include "river3D_vulkan.h"
 #include "rv_print_macros.h"
+
+#include "pd_dyn_arr.h"
 
 #include "vulkan/vulkan_core.h"
 
@@ -57,7 +60,8 @@ QueueFamilyIndices findQueueFamilies
     vkGetPhysicalDeviceQueueFamilyProperties(*device, &queueFamilyCount, 0);
 
     VkQueueFamilyProperties physicalQueueFamilies[queueFamilyCount];
-    vkGetPhysicalDeviceQueueFamilyProperties(*device, &queueFamilyCount, physicalQueueFamilies);
+    vkGetPhysicalDeviceQueueFamilyProperties(*device, &queueFamilyCount,
+                                             physicalQueueFamilies);
 
     VkBool32 presentSupport = false;
 
@@ -132,8 +136,9 @@ f_internal u32 rateDeviceSuitability
     {
         SwapchainSupportDetails swapchainSupport =
             querySwapchainSupport(device, engine->vkData->surface);
-        if(swapchainSupport.formats.empty() || swapchainSupport.presentModes.empty())
-        {
+        if(!pdArrSize(swapchainSupport.formats) ||
+            !pdArrSize(swapchainSupport.presentModes)
+        ){
             return 0;
         }
     }
@@ -195,17 +200,18 @@ SwapchainSupportDetails querySwapchainSupport
 
 void pickPhysicalDevice
 (
-    EngineData &engine
+    EngineData *engine
 ){
     u32 deviceCount = 0;
 
     vkEnumeratePhysicalDevices(engine->vkData->instance, &deviceCount, 0);
     if(0 == deviceCount)
     {
-        riverLog("failed to find any GPU with vulkan support!", RIV_LOG_LEVEL_ERROR);
+        RV_ERROR("failed to find any GPU with vulkan support!");
     }
 
-    std::vector<VkPhysicalDevice> devices(deviceCount);
+    VkPhysicalDevice devices = 0;
+    pdArrReserve(devices, deviceCount);
     std::multimap<u32, VkPhysicalDevice> suitabilityCandidates;
 
     vkEnumeratePhysicalDevices(engine.instance, &deviceCount, devices.data());
@@ -230,19 +236,19 @@ void createLogicalDevice
 (
     EngineData *engine
 ){
-    QueueFamilyIndices indices = findQueueFamilies(engine.physicalDevice, engine.surface);
-    engine.logicalQueueFamilies.graphicsIndex = indices.graphicsIndex;
-    engine.logicalQueueFamilies.transferIndex = indices.transferIndex;
-    engine.logicalQueueFamilies.presentIndex  = indices.presentIndex;
+    QueueFamilyIndices indices = findQueueFamilies(engine->vkData->physicalDevice,
+                                                   engine->vkData->surface);
+    engine->vkData->logicalQueueFamilies.graphicsIndex = indices.graphicsIndex;
+    engine->vkData->logicalQueueFamilies.transferIndex = indices.transferIndex;
+    engine->vkData->logicalQueueFamilies.presentIndex  = indices.presentIndex;
+    engine->vkData->msaaSamples                        = getMaxMSAASamples(engine);
 
-    engine.msaaSamples = getMaxMSAASamples(engine);
-
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+    VkDeviceQueueCreateInfo queueCreateInfos = 0;
     std::set<u32> uniqueQueueFamilies =
     {
-        engine.logicalQueueFamilies.graphicsIndex,
-        engine.logicalQueueFamilies.transferIndex,
-        engine.logicalQueueFamilies.presentIndex
+        engine->vkData->logicalQueueFamilies.graphicsIndex,
+        engine->vkData->logicalQueueFamilies.transferIndex,
+        engine->vkData->logicalQueueFamilies.presentIndex
     };
 
     float queuePriority = 1.0f;
@@ -253,7 +259,7 @@ void createLogicalDevice
         queueCreateInfo.queueFamilyIndex = queueFamily;
         queueCreateInfo.queueCount       = 1;
         queueCreateInfo.pQueuePriorities = &queuePriority;
-        queueCreateInfos.emplace_back(queueCreateInfo);
+        pdArrPush(queueCreateInfos, queueCreateInfo);
     }
 
     VkPhysicalDeviceFeatures deviceFeatures = {0};
@@ -261,11 +267,11 @@ void createLogicalDevice
 
     VkDeviceCreateInfo createInfo = {0};
     createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.pQueueCreateInfos       = queueCreateInfos.data();
-    createInfo.queueCreateInfoCount    = queueCreateInfos.size();
+    createInfo.pQueueCreateInfos       = queueCreateInfos;
+    createInfo.queueCreateInfoCount    = pdArrSize(queueCreateInfos);
     createInfo.pEnabledFeatures        = &deviceFeatures;
-    createInfo.enabledExtensionCount   = deviceExtensions.size();
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.enabledExtensionCount   = pdArrSize(deviceExtensions);
+    createInfo.ppEnabledExtensionNames = deviceExtensions;
 
     #ifdef DEBUG
         createInfo.enabledLayerCount   = alidationLayers.size();
@@ -274,16 +280,19 @@ void createLogicalDevice
         createInfo.enabledLayerCount = 0;
     #endif
 
-    VkResult result = vkCreateDevice(engine.physicalDevice, &createInfo, 0,
-                                     &engine.logicalDevice);
+    VkResult result = vkCreateDevice(engine->vkData->physicalDevice, &createInfo, 0,
+                                     &engine->vkData->logicalDevice);
     RIV_ASSERT_VK_SUCCESS(result, "failed to create logical device.");
 
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.graphicsIndex, 0,
-                     &engine.graphicsQueue);
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.transferIndex, 0,
-                     &engine.transferQueue);
-    vkGetDeviceQueue(engine.logicalDevice, engine.logicalQueueFamilies.presentIndex, 0,
-                     &engine.presentQueue);
+    vkGetDeviceQueue(engine->vkData->logicalDevice,
+                     engine->vkData->logicalQueueFamilies.graphicsIndex, 0,
+                     &engine->vkData->graphicsQueue);
+    vkGetDeviceQueue(engine->vkData->logicalDevice,
+                     engine->vkData->logicalQueueFamilies.transferIndex, 0,
+                     &engine->vkData->transferQueue);
+    vkGetDeviceQueue(engine->vkData->logicalDevice,
+                     engine->vkData->logicalQueueFamilies.presentIndex, 0,
+                     &engine->vkData->presentQueue);
 
     vkGetPhysicalDeviceProperties(engine.physicalDevice, &engine.deviceProperties);
     vkGetPhysicalDeviceFeatures(engine.physicalDevice, &deviceFeatures);

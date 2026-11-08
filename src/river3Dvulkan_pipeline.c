@@ -19,7 +19,7 @@ f_internal VkShaderModule createShaderModule
     VkShaderModuleCreateInfo createInfo = {0};
     createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size;
-    createInfo.pCode    = (const uint32_t*)(code.data);
+    createInfo.pCode    = (const u32*)(code.data);
 
     VkShaderModule shaderModule = {0};
     VkResult result = vkCreateShaderModule(engine->vkData->logicalDevice,
@@ -112,15 +112,17 @@ void createGraphicsPipeline
     multisampleSCI.alphaToOneEnable      = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState colorBlendAS = {0};
-    colorBlendAS.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAS.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+                                  VK_COLOR_COMPONENT_G_BIT |
+                                  VK_COLOR_COMPONENT_B_BIT |
+                                  VK_COLOR_COMPONENT_A_BIT;
     colorBlendAS.blendEnable    = VK_FALSE;
 
     VkPipelineColorBlendStateCreateInfo colorBlendCI = {0};
     colorBlendCI.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendCI.logicOpEnable   = VK_FALSE;
     colorBlendCI.attachmentCount = 1;
-    colorBlendCI.pAttachments    = &colorBlendAttachmentState;
+    colorBlendCI.pAttachments    = &colorBlendAS;
 
     VkPipelineDepthStencilStateCreateInfo depthStencilSCI = {0};
     depthStencilSCI.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -131,18 +133,19 @@ void createGraphicsPipeline
     depthStencilSCI.minDepthBounds        = 0.0f;
     depthStencilSCI.maxDepthBounds        = 1.0f;
     depthStencilSCI.stencilTestEnable     = VK_FALSE;
-    depthStencilSCI.front                 = = {0};
-    depthStencilSCI.back                  = = {0};
+    // depthStencilSCI.front                 = {0};
+    // depthStencilSCI.back                  = {0};
 
     VkPipelineLayoutCreateInfo piplelineLayoutCI = {0};
     piplelineLayoutCI.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     piplelineLayoutCI.setLayoutCount = 1;
-    piplelineLayoutCI.pSetLayouts    = &engine.descriptorSetLayout;
+    piplelineLayoutCI.pSetLayouts    = &engine->vkData->descriptorSetLayout;
 
-    VkResult result = vkCreatePipelineLayout(engine.logicalDevice, &piplelineLayoutCI,
-                                             0, &engine.graphicsPipelineLayout);
+    VkResult result = vkCreatePipelineLayout(engine->vkData->logicalDevice,
+                                             &piplelineLayoutCI, 0,
+                                             &engine->vkData->graphicsPipelineLayout);
 
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create pipeline layout!");
+    RV_ASSERT(result == VK_SUCCESS, "failed to create pipeline layout!");
 
     VkGraphicsPipelineCreateInfo graphicsCI = {0};
     graphicsCI.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -158,8 +161,8 @@ void createGraphicsPipeline
     graphicsCI.pColorBlendState    = &colorBlendStateCreateInfo;
     graphicsCI.pDynamicState       = &dynamicStateCreateInfo;
 
-    graphicsCI.layout              = engine.graphicsPipelineLayout;
-    graphicsCI.renderPass          = engine.renderPass;
+    graphicsCI.layout              = engine->vkData->graphicsPipelineLayout;
+    graphicsCI.renderPass          = engine->vkData->renderPass;
     graphicsCI.subpass             = 0;
 
     result = vkCreateGraphicsPipelines(engine.logicalDevice, VK_NULL_HANDLE, 1,
@@ -188,7 +191,7 @@ void createFramebuffers
         VkFramebufferCreateInfo framebufferCreateInfo = {0};
         framebufferCreateInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferCreateInfo.renderPass      = engine.renderPass;
-        framebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        framebufferCreateInfo.attachmentCount = static_cast<u32>(attachments.size());
         framebufferCreateInfo.pAttachments    = attachments.data();
         framebufferCreateInfo.width           = engine.swapchainExtent.width;
         framebufferCreateInfo.height          = engine.swapchainExtent.height;
@@ -207,7 +210,7 @@ void recordCommandBuffer
 (
     const EngineData      *engine,
     const VkCommandBuffer *commandBuffer,
-    const uint32_t        *imageIndex
+    const u32        *imageIndex
 ){
     VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -261,7 +264,7 @@ void recordCommandBuffer
                             engine->vkData->graphicsPipelineLayout, 0, 1,
                             &engine.descriptorSets[currentFrame], 0, 0);
 
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(engine.vertexIndices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<u32>(engine.vertexIndices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -461,7 +464,7 @@ void createDescriptorSetLayout
 
     VkDescriptorSetLayoutCreateInfo dscLCI = {0};
     dscLCI.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    dscLCI.bindingCount = static_cast<uint32_t>(bindings.size());
+    dscLCI.bindingCount = static_cast<u32>(bindings.size());
     dscLCI.pBindings    = bindings.data();
 
     VkResult result = vkCreateDescriptorSetLayout(engine.logicalDevice, &dscLCI, 0,
@@ -482,9 +485,9 @@ void createDescriptorPool
 
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {0};
     descriptorPoolCreateInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+    descriptorPoolCreateInfo.poolSizeCount = static_cast<u32>(poolSizes.size());
     descriptorPoolCreateInfo.pPoolSizes    = poolSizes.data();
-    descriptorPoolCreateInfo.maxSets       = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    descriptorPoolCreateInfo.maxSets       = static_cast<u32>(MAX_FRAMES_IN_FLIGHT);
     descriptorPoolCreateInfo.flags         = 0;
 
     VkResult result = vkCreateDescriptorPool(engine->vkData->logicalDevice,
@@ -495,18 +498,20 @@ void createDescriptorPool
 
 void createDescriptorSets
 (
-    EngineData &engine
+    EngineData *engine
 ){
     std::vector<VkDescriptorSetLayout> setLayouts(MAX_FRAMES_IN_FLIGHT, engine.descriptorSetLayout);
 
     VkDescriptorSetAllocateInfo descriptorSetAllocInfo = {0};
     descriptorSetAllocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descriptorSetAllocInfo.descriptorPool     = engine.descriptorPool;
-    descriptorSetAllocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    descriptorSetAllocInfo.descriptorPool     = engine->vkData->descriptorPool;
+    descriptorSetAllocInfo.descriptorSetCount = (u32)(MAX_FRAMES_IN_FLIGHT);
     descriptorSetAllocInfo.pSetLayouts        = setLayouts.data();
 
     engine.descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    VkResult result = vkAllocateDescriptorSets(engine.logicalDevice, &descriptorSetAllocInfo, engine.descriptorSets.data());
+    VkResult result = vkAllocateDescriptorSets(engine->vkData->logicalDevice,
+                                               &descriptorSetAllocInfo,
+                                               engine->vkData->descriptorSets);
     RV_ASSERT(result == VK_SUCCESS, "failed to allocate descriptor sets!");
 
     for(size i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
@@ -543,16 +548,14 @@ void createDescriptorSets
         samplerWriteDescriptorSet.pImageInfo       = &descriptorImageInfo;
         samplerWriteDescriptorSet.pTexelBufferView = 0;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorSetWrites =
+        VkWriteDescriptorSet descriptorSetWrites[2] =
         {
             uniformWriteDescriptorSet,
             samplerWriteDescriptorSet
         };
 
         vkUpdateDescriptorSets(engine.logicalDevice,
-                               static_cast<uint32_t>(descriptorSetWrites.size()),
-                               descriptorSetWrites.data(),
-                               0,
-                               0);
+                               (u32)(pdArrSize(descriptorSetWrites)),
+                               descriptorSetWrites, 0, 0);
     }
 }

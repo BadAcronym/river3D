@@ -1,6 +1,8 @@
 #ifndef RV3D_VULKAN_H
 #define RV3D_VULKAN_H
 
+#include "river3D_main.h"
+
 typedef PFN_vkCreateDebugUtilsMessengerEXT  vkCreateMsgr;
 typedef PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyMsgr;
 
@@ -49,7 +51,7 @@ extern void createBuffer
     const VkMemoryPropertyFlags *memPropFlags,
     VkBuffer                    *buffer,
     VkDeviceMemory              *bufferMemory,
-    const std::set<u32>         *uniqueQueueFamilies
+    const u32                   *uniqueQueueFamilies // was a const std::set
 );
 
 extern void createDepthResources
@@ -76,20 +78,27 @@ extern void createUniformBuffers
 
 extern VkFormat findSupportedFormat
 (
-    const EngineData            *engine,
-    const std::vector<VkFormat> *candidates,
-    const VkImageTiling         *tiling,
-    const VkFormatFeatureFlags  *features
+    const EngineData           *engine,
+    const VkFormat             *candidates,
+    const VkImageTiling        *tiling,
+    const VkFormatFeatureFlags *features
 );
 
 extern void updateUniformBuffer
 (
     const EngineData *engine,
-    u32         currentImage //redundant?
+    u32              currentImage //redundant?
 );
 
-extern VkVertexInputBindingDescription getVertexBindingDescription();
-extern VkVertexInputAttributeDescription* getVertexAttributeDescriptions();
+extern VkVertexInputBindingDescription getVertexBindingDescription
+(
+    void
+);
+
+extern VkVertexInputAttributeDescription* getVertexAttributeDescriptions
+(
+    void
+);
 
 extern void createImage
 (
@@ -136,7 +145,7 @@ extern void transitionImageLayout
 
 extern void createGraphicsPipeline
 (
-    EngineData *engine,
+    EngineData *engine
 );
 
 extern void createFramebuffers
@@ -202,14 +211,12 @@ extern void recordCommandBuffer
 
 extern void createSwapchain
 (
-    EngineData          *engine,
-    const UserSettings  *settings
+    EngineData *engine
 );
 
 extern void recreateSwapchain
 (
-    EngineData         *engine,
-    const UserSettings *settings
+    EngineData *engine
 );
 
 extern void createRenderPass

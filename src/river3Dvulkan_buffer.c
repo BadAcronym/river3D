@@ -1,4 +1,8 @@
 #include "river3D_main.h"
+#include "river3D_vulkan.h"
+#include "rv_print_macros.h"
+
+#include "pd_dyn_arr.h"
 
 #include "vertstream_main.h"
 
@@ -6,16 +10,16 @@
 
 void loadModel
 (
-    EngineData &engine,
+    EngineData *engine,
     StringView modelPath
 ){
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
 
     bool result = tinyobj::LoadObj(&attributes, &shapes, &materials, &warn, &error, modelPath.string().c_str());
-    RIV_ASSERT(result, (warn + error));
+    RV_ASSERT(result, (warn + error));
 
-    std::unordered_map<Vertex, uint32_t> uniqueVertices = {0};
+    std::unordered_map<Vertex, u32> uniqueVertices = {0};
 
     for(const tinyobj::shape_t &shape : shapes)
     {
@@ -40,7 +44,7 @@ void loadModel
 
             if(!uniqueVertices.contains(vertex))
             {
-                uniqueVertices[vertex] = static_cast<uint32_t>(engine.vertices.size());
+                uniqueVertices[vertex] = (u32)(engine.vertices.size());
                 engine.vertices.emplace_back(vertex);
             }
 
@@ -85,23 +89,24 @@ VkVertexInputAttributeDescription* getVertexAttributeDescriptions
     return attributeDescriptions;
 }
 
-uint32_t findSuitableMemoryType
+u32 findSuitableMemoryType
 (
     const EngineData            *engine,
-    const uint32_t              *typeFilter,
+    const u32                   *typeFilter,
     const VkMemoryPropertyFlags *flags
 ){
-    for(uint32_t i = 0; i < engine.deviceMemoryProperties.memoryTypeCount; ++i)
+    for(u32 i = 0; i < engine->vkData->deviceMemoryProperties.memoryTypeCount; ++i)
     {
         if(typeFilter & (1 << i) &&
-          ((engine.deviceMemoryProperties.memoryTypes[i].propertyFlags & flags) == flags))
-        {
+          ((engine->vkData->deviceMemoryProperties.memoryTypes[i].propertyFlags &
+            flags) == flags)
+        ){
             return i;
         }
     }
 
-    riverLog("failed to find suitable memory type!", RIV_LOG_LEVEL_ERROR);
-    return UINT32_MAX;
+    RV_ERROR("failed to find suitable memory type!");
+    return U32MAX;
 }
 
 void createBuffer
@@ -112,7 +117,7 @@ void createBuffer
     const VkMemoryPropertyFlags *memPropFlags,
     VkBuffer                    *buffer,
     VkDeviceMemory              *bufferMemory,
-    const std::set<uint32_t>    *uniqueQueueFamilies
+    const u32                   *uniqueQueueFamilies
 ){
     VkBufferCreateInfo bufferInfo = {0};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -128,47 +133,58 @@ void createBuffer
         bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    std::vector<uint32_t> queueFamilyIndices(uniqueQueueFamilies.begin(), uniqueQueueFamilies.end());
+    u32 queueFamilyIndices = 0;
 
-    bufferInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
-    bufferInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+    for(i64 i = 0; i < pdArrSize(uniqueQueueFamilies); ++i)
+    {
+        pdArrPush(queueFamilyIndices, uniqueQueueFamilies[i]);
+    }
 
-    VkResult result = vkCreateBuffer(engine.logicalDevice, &bufferInfo, nullptr, &buffer);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to create buffer!");
+    bufferInfo.queueFamilyIndexCount = (u32)(pdArrSize(queueFamilyIndices));
+    bufferInfo.pQueueFamilyIndices   = queueFamilyIndices;
+
+    VkResult result = vkCreateBuffer(engine->vkData->logicalDevice, &bufferInfo, 0,
+                                     &buffer);
+    RV_ASSERT(result == VK_SUCCESS, "failed to create buffer!");
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(engine.logicalDevice, buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(engine->vkData->logicalDevice, buffer,
+                                  &memRequirements);
 
     VkMemoryAllocateInfo allocInfo = {0};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = findSuitableMemoryType(engine, memRequirements.memoryTypeBits, memPropFlags);
+    allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize  = memRequirements.size;
+    allocInfo.memoryTypeIndex = findSuitableMemoryType(engine,
+                                                       memRequirements.memoryTypeBits,
+                                                       memPropFlags);
 
-    result = vkAllocateMemory(engine.logicalDevice, &allocInfo, nullptr, &bufferMemory);
-    RIV_ASSERT_VK_SUCCESS(result, "failed to allocate buffer!");
+    result = vkAllocateMemory(engine->vkData->logicalDevice, &allocInfo, 0,
+                              &bufferMemory);
+    RV_ASSERT(result == VK_SUCCESS, "failed to allocate buffer!");
 
-    vkBindBufferMemory(engine.logicalDevice, buffer, bufferMemory, 0);
+    vkBindBufferMemory(engine->vkData->logicalDevice, buffer, bufferMemory, 0);
 }
 
-internal void copyBuffer
+f_internal void copyBuffer
 (
     EngineData         *engine,
     const VkBuffer     *srcBuffer,
     const VkBuffer     *dstBuffer,
     const VkDeviceSize *bufferSize
 ){
-  VkCommandBuffer commandBuffer = setupCommandBuffer(engine,
-                                                     engine.transferCommandPool);
+  VkCommandBuffer commandBuffer =
+        setupCommandBuffer(engine, engine->vkData->transferCommandPool);
 
   VkBufferCopy transferCopyRegion = {0};
-  transferCopyRegion.size = bufferSize;
+  transferCopyRegion.size      = bufferSize;
   transferCopyRegion.srcOffset = 0;
   transferCopyRegion.dstOffset = 0;
 
   vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &transferCopyRegion);
 
-  flushCommandBuffer(engine, commandBuffer, engine.transferCommandPool,
-                     engine.transferQueue);
+  flushCommandBuffer(engine->vkData-> commandBuffer,
+                     engine->vkData->transferCommandPool,
+                     engine->vkData->transferQueue);
 }
 
 void createVertexBuffer
@@ -181,10 +197,10 @@ void createVertexBuffer
 
     VkDeviceSize bufferSize = engine.vertSize + indexSize;
 
-    VkBuffer       stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
+    VkBuffer       stagingBuffer       = {0};
+    VkDeviceMemory stagingBufferMemory = {0};
 
-    uint32_t queueFamilies[2] =
+    u32 queueFamilies[2] =
     {
         engine.logicalQueueFamilies.graphicsIndex,
         engine.logicalQueueFamilies.transferIndex
@@ -198,28 +214,30 @@ void createVertexBuffer
                  stagingBufferMemory,
                  queueFamilies);
 
-    void* pData;
+    void* data = 0;
 
-    vkMapMemory(engine.logicalDevice, stagingBufferMemory, 0, engine.vertSize, 0, &pData);
-    memcpy(pData, engine.vertices.data(), static_cast<size_t>(engine.vertSize));
-    vkUnmapMemory(engine.logicalDevice, stagingBufferMemory);
+    vkMapMemory(engine->vkData->logicalDevice, stagingBufferMemory, 0,
+                engine->vkData->vertSize, 0, &data);
+    memcpy(data, engine->vkData->vertices, (size)(engine->vkData->vertSize));
+    vkUnmapMemory(engine->vkData->logicalDevice, stagingBufferMemory);
 
-    vkMapMemory(engine.logicalDevice, stagingBufferMemory, engine.vertSize, indexSize, 0, &pData);
-    memcpy(pData, engine.vertexIndices.data(), static_cast<size_t>(indexSize));
-    vkUnmapMemory(engine.logicalDevice, stagingBufferMemory);
+    vkMapMemory(engine->vkData->logicalDevice, stagingBufferMemory,
+                engine->vkData->vertSize, indexSize, 0, &data);
+    memcpy(data, engine->vkData->vertexIndices, (size)(indexSize));
+    vkUnmapMemory(engine->vkData->logicalDevice, stagingBufferMemory);
 
-    createBuffer(engine,
-                 bufferSize,
-                 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+    createBuffer(engine, bufferSize,
+                 VK_BUFFER_USAGE_TRANSFER_DST_BIT  |
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                 engine.vertexBuffer,
-                 engine.vertexBufferMemory,
-                 queueFamilies);
+                 engine->vkData->vertexBuffer,
+                 engine->vkData->vertexBufferMemory, queueFamilies);
 
-    copyBuffer(engine, stagingBuffer, engine.vertexBuffer, bufferSize);
+    copyBuffer(engine->vkData->stagingBuffer, engine->vkData->vertexBuffer, bufferSize);
 
-    vkDestroyBuffer(engine.logicalDevice, stagingBuffer, nullptr);
-    vkFreeMemory(engine.logicalDevice, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(engine->vkData->logicalDevice, stagingBuffer, 0);
+    vkFreeMemory(engine->vkData->logicalDevice, stagingBufferMemory, 0);
 }
 
 void createUniformBuffers
@@ -234,33 +252,31 @@ void createUniformBuffers
 
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-        std::set<uint32_t> uniqueFamilyIndices =
+        std::set<u32> uniqueFamilyIndices =
         {
             engine.logicalQueueFamilies.graphicsIndex,
             engine.logicalQueueFamilies.presentIndex
         };
 
-        createBuffer(engine,
-                     uniformBufferSize,
+        createBuffer(engine, uniformBufferSize,
                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     engine.uniformBuffers[i],
-                     engine.uniformBuffersMemory[i],
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                     engine->vkData->uniformBuffers[i],
+                     engine->vkData->uniformBuffersMemory[i],
                      uniqueFamilyIndices);
 
-        vkMapMemory(engine.logicalDevice,
-                    engine.uniformBuffersMemory[i],
-                    0,
-                    uniformBufferSize,
-                    0,
-                    &engine.uniformBuffersMapped[i]);
+        vkMapMemory(engine->vkData->logicalDevice,
+                    engine->vkData->uniformBuffersMemory[i], 0,
+                    uniformBufferSize, 0,
+                    &engine->vkData->uniformBuffersMapped[i]);
     };
 }
 
 void updateUniformBuffer
 (
-    const EngineData &engine,
-    uint32_t         currentImage //redundant?
+    EngineData *engine,
+    u32        currentImage //redundant?
 ){
     persistent std::chrono::time_point startTime = std::chrono::high_resolution_clock::now();
 
@@ -268,9 +284,9 @@ void updateUniformBuffer
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject uniformBuffer = {0};
-    uniformBuffer.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(20.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    uniformBuffer.view = glm::lookAt(glm::vec3(1.0f, 0.0f, 0.3f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    uniformBuffer.projection =  glm::perspective(glm::radians(35.0f),
+    uniformBuffer.model      = glm::rotate(glm::mat4(1.0f), time * glm::radians(20.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    uniformBuffer.view       = glm::lookAt(glm::vec3(1.0f, 0.0f, 0.3f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    uniformBuffer.projection = glm::perspective(glm::radians(35.0f),
                                                  engine.swapchainExtent.width /
                                                     static_cast<float>(engine.swapchainExtent.height),
                                                  0.1f,
@@ -278,20 +294,22 @@ void updateUniformBuffer
 
     uniformBuffer.projection[1][1] *= -1;
 
-    ::memcpy(engine.uniformBuffersMapped[currentImage], &uniformBuffer, sizeof(uniformBuffer));
+    memcpy(engine->vkData->uniformBuffersMapped[currentImage],
+           &uniformBuffer, sizeof(uniformBuffer));
 }
 
 VkFormat findSupportedFormat
 (
-    const EngineData            &engine,
-    const std::vector<VkFormat> &candidates,
-    const VkImageTiling         &tiling,
-    const VkFormatFeatureFlags  &features
+    const EngineData           *engine,
+    const VkFormat             *candidates,
+    const VkImageTiling        *tiling,
+    const VkFormatFeatureFlags *features
 ){
-    for(VkFormat format : candidates)
+    for(u64 i = 0; i < pdArrSize(candidates); ++i)
     {
-        VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(engine.physicalDevice, format, &props);
+        VkFormatProperties props = {0};
+        vkGetPhysicalDeviceFormatProperties(engine->vkData->physicalDevice,
+                                            format, &props);
 
         if(tiling == VK_IMAGE_TILING_LINEAR &&
           ((props.linearTilingFeatures & features) == features))
@@ -304,46 +322,40 @@ VkFormat findSupportedFormat
             return format;
         }
     }
-    riverThrow("failed to find supported format!");
-    return VK_FORMAT_MAX_ENUM; //to silence clang
+
+    RV_ERROR("failed to find supported format!");
+    return VK_FORMAT_MAX_ENUM;
 }
 
 void createDepthResources
 (
-    EngineData &engine
+    EngineData *engine
 ){
-    const std::vector<VkFormat> candidates =
+    VkFormat candidates[3] =
     {
         VK_FORMAT_D32_SFLOAT,
         VK_FORMAT_D32_SFLOAT_S8_UINT,
         VK_FORMAT_D24_UNORM_S8_UINT
     };
 
-    const VkFormat depthFormat = findSupportedFormat(engine,
-                                                     candidates,
-                                                     VK_IMAGE_TILING_OPTIMAL,
-                                                     VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    const VkFormat depthFormat =
+        findSupportedFormat(engine, candidates,
+                            VK_IMAGE_TILING_OPTIMAL,
+                            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     createImage(engine,
-                engine.swapchainExtent.width,
-                engine.swapchainExtent.height,
-                1,
-                depthFormat,
+                engine->vkData->swapchainExtent.width,
+                engine->vkData->swapchainExtent.height,
+                1, depthFormat,
                 VK_IMAGE_TILING_OPTIMAL,
                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                engine.depthImage,
-                engine.depthImageMemory);
+                engine->vkData->depthImage,
+                engine->vkData->depthImageMemory);
 
-    engine.depthImageView = createImageView(engine,
-                                            engine.depthImage,
-                                            1,
-                                            depthFormat,
-                                            VK_IMAGE_ASPECT_DEPTH_BIT);
+    engine.depthImageView = createImageView(engine, engine->depthImage, 1,
+                                            depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    transitionImageLayout(engine,
-                          engine.depthImage,
-                          1,
-                          depthFormat,
+    transitionImageLayout(engine, engine->depthImage, 1, depthFormat,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }

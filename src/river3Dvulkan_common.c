@@ -405,27 +405,32 @@ void vkShutdown
 (
     EngineData *engine
 ){
-    vkDeviceWaitIdle(engine.logicalDevice);
+    vkDeviceWaitIdle(engine->vkData->logicalDevice);
 
     cleanupSyncObjects(engine);
     cleanupSwapchain(engine);
 
-    vkDestroySampler(engine.logicalDevice, engine.textureSampler, 0);
+    vkDestroySampler(engine->vkData->logicalDevice, engine->vkData->textureSampler, 0);
 
-    vkDestroyImage(engine.logicalDevice, engine.textureImage, 0);
-    vkFreeMemory(engine.logicalDevice, engine.textureImageMemory, 0);
-    vkDestroyImageView(engine.logicalDevice, engine.textureImageView, 0);
+    vkDestroyImage(engine->vkData->logicalDevice, engine->vkData->textureImage, 0);
+    vkFreeMemory(engine->vkData->logicalDevice, engine->vkData->textureImageMemory, 0);
+    vkDestroyImageView(engine->vkData->logicalDevice,
+                       engine->vkData->textureImageView, 0);
 
-    vkDestroyBuffer(engine.logicalDevice, engine.vertexBuffer, 0);
-    vkFreeMemory(engine.logicalDevice, engine.vertexBufferMemory, 0);
+    vkDestroyBuffer(engine->vkData->logicalDevice, engine->vkData->vertexBuffer, 0);
+    vkFreeMemory(engine->vkData->logicalDevice, engine->vkData->vertexBufferMemory, 0);
 
-    vkDestroyDescriptorPool(engine.logicalDevice, engine.descriptorPool, 0);
-    vkDestroyDescriptorSetLayout(engine.logicalDevice, engine.descriptorSetLayout, 0);
+    vkDestroyDescriptorPool(engine->vkData->logicalDevice,
+                            engine->vkData->descriptorPool, 0);
+    vkDestroyDescriptorSetLayout(engine->vkData->logicalDevice,
+                                 engine->vkData->descriptorSetLayout, 0);
 
-    vkDestroyPipeline(engine.logicalDevice, engine.graphicsPipeline, 0);
-    vkDestroyPipelineLayout(engine.logicalDevice, engine.graphicsPipelineLayout, 0);
+    vkDestroyPipeline(engine->vkData->logicalDevice,
+                      engine->vkData->graphicsPipeline, 0);
+    vkDestroyPipelineLayout(engine->vkData->logicalDevice,
+                            engine->vkData->graphicsPipelineLayout, 0);
 
-    vkDestroyRenderPass(engine.logicalDevice, engine.renderPass, 0);
+    vkDestroyRenderPass(engine->vkData->logicalDevice, engine->vkData->renderPass, 0);
 
     for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
