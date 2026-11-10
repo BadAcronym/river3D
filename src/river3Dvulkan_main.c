@@ -1,7 +1,10 @@
 #include "river3D_main.h"
+#include "river3D_vulkan.h"
 #include "rv_print_macros.h"
 
+#include "pd_dyn_arr.h"
 #include "pd_int_types.h"
+#include "pd_string_view.h"
 
 f_internal VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback
 (
@@ -21,7 +24,8 @@ f_internal VkResult CreateDebugUtilsMessengerEXT
     const VkAllocationCallbacks              *pAllocator,
     VkDebugUtilsMessengerEXT                 *pDebugMessenger
 ){
-    vkCreateMsgr func = (vkCreateMsgr)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    vkCreateMsgr func =
+        (vkCreateMsgr)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if(func)
     {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -32,18 +36,22 @@ f_internal VkResult CreateDebugUtilsMessengerEXT
     }
 }
 
-f_internal std::vector<const char*> getRequiredExtensions
+f_internal StringView* getRequiredExtensions
 (
     void
 ){
-    u32 glfwExtensionCount = 0;
-    const char** glfwExtensions;
+    StringView *extensions = 0;
 
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    // TODO: need to figure out what other extensions I'll need instead
+    // u32 glfwExtensionCount = 0;
+    // const char** glfwExtensions;
+    //
+    // glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+    // pdArrReserve(extensions, glfwExtensions + glfwExtensionCount);
 
     #ifdef DEBUG
-        extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        StringView debugUtils = pdCstrSV(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        pdArrPush(extensions, debugUtils);
     #endif
 
     return extensions;
@@ -59,68 +67,86 @@ f_internal bool checkValidationLayerSupport
     VkLayerProperties layers[layerCount];
     vkEnumerateInstanceLayerProperties(&layerCount, layers);
 
-    for(const char *layer : device::validationLayers)
+    for(u64 i = 0; i < VALIDATION_LAYER_COUNT; ++i)
     {
-        for(const auto &layerPresent : layerVec)
+        StringView needed = pdCstrSV(validationLayers[i]);
+        for(u64 j = 0; j < layerCount; ++j)
         {
-            if(0 == strcmp(layerPresent.layerName, layer))
+            StringView curr = pdCstrSV(layers[j].layerName);
+            if(pdSVSame(curr, needed))
             {
-                layerFound = true;
-                break;
+                goto layerFound;
             }
         }
+
+        RV_WARN("validation layer '"PRI_SV"' support missing.", ARG_SV(needed));
+        goto notFound;
+
+    layerFound:
+        continue;
     }
 
     return true;
+
+notFound:
+    return false;
 }
 
-f_internal void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
-{
-    createInfo                 = {};
-    createInfo.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
-                                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
-                                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = debugCallback;
+f_internal void populateDebugMessengerCreateInfo
+(
+    VkDebugUtilsMessengerCreateInfoEXT *info
+){
+    VkDebugUtilsMessengerCreateInfoEXT nullInfo = {0};
+
+    *info                 = nullInfo;
+    info->sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    info->sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    info->messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    info->messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
+                            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    info->pfnUserCallback = debugCallback;
 }
 
 f_internal bool checkInstanceExtensions
 (
-    std::vector<const char*> *requiredExt,
-    std::vector<VkExtensionProperties> *instanceExt
+    StringView            *requiredExt,
+    VkExtensionProperties *instanceExt
 ){
     RV_DEBUG("Present:");
-    for(const auto &extension : *instanceExt)
+    for(u64 i = 0, N = pdArrSize(instanceExt); i < N; ++i)
     {
-        RV_DEBUG("%s", extension.extensionName);
+        RV_DEBUG("%s", instanceExt[i].extensionName);
     }
 
     RV_DEBUG("Required:");
-    for(const auto &required : *requiredExt)
+    for(u64 i = 0, N = pdArrSize(requiredExt); i < N; ++i)
     {
-        for(const auto &present : *instanceExt)
+        for(u64 j = 0, N = pdArrSize(instanceExt); j < N; ++j)
         {
-            if(0 == strcmp(required, present.extensionName))
+            StringView curr = pdCstrSV(instanceExt[i].extensionName);
+            if(pdSVSame(requiredExt[i], curr))
             {
-                    RV_DEBUG("found:\t", 0, 0);
-                    RV_DEBUG(required, 1, 1);
+                    RV_DEBUG("found:\t");
+                    RV_DEBUG(required);
                     extFound = true;
                     break;
                 }
             }
             if(!extFound)
             {
-                RV_DEBUG("not found:\t", 0, 0);
+                RV_DEBUG("not found:\t");
                 return false;
             }
         }
     }
 
     return true;
+
+notFound:
+    return false;
 }
 
 void rvCreateInstance
@@ -134,11 +160,11 @@ void rvCreateInstance
     }
     #endif
 
-    VkApplicationInfo appInfo = {0};
+    VkApplicationInfo appInfo  = {0};
     appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName   = river::appName;
+    appInfo.pApplicationName   = "river3D engine test";
     appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
-    appInfo.pEngineName        = river::engineName;
+    appInfo.pEngineName        = "river3D";
     appInfo.engineVersion      = VK_MAKE_API_VERSION(0, 1, 0, 0);
     appInfo.apiVersion         = VK_API_VERSION_1_0;
 
@@ -148,22 +174,24 @@ void rvCreateInstance
     vkEnumerateInstanceExtensionProperties(0, &instanceExtensionCount,
                                            instanceExtensions);
 
-    std::vector<const char*> requiredExtensions = getRequiredExtensions();
-    if(checkInstanceExtensions(&requiredExtensions, &instanceExtensions)){
-        RV_DEBUG("\nAll required extensions are present.", 0, 1);
-    }else{
-        RV_DEBUG("\nERROR: extensions required, but not available!", 2, 1);
-        throw std::runtime_error("extensions required, but not available!");
+    StringView *requiredExtensions = getRequiredExtensions();
+    if(checkInstanceExtensions(&requiredExtensions, &instanceExtensions))
+    {
+        RV_DEBUG("All required extensions are present.");
+    }
+    else
+    {
+        RV_ERROR("extensions required, but not available!");
     }
 
     VkInstanceCreateInfo createInfo = {0};
     createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo        = &appInfo;
-    createInfo.enabledExtensionCount   = static_cast<u32>(requiredExtensions.size());
-    createInfo.ppEnabledExtensionNames = requiredExtensions.data();
+    createInfo.enabledExtensionCount   = (u32)(pdArrSize(requiredExtensions));
+    createInfo.ppEnabledExtensionNames = requiredExtensions;
     createInfo.enabledLayerCount       = 0;
 
-    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {0};
     if(build_DEBUG){
         createInfo.enabledLayerCount = static_cast<u32>(device::validationLayers.size());
         createInfo.ppEnabledLayerNames = device::validationLayers.data();
@@ -239,7 +267,7 @@ void rvCreateFramebuffers
     {
         VkImageView attachments[] = { swapchainImageViews[i] };
 
-        VkFramebufferCreateInfo framebufferInfo{};
+        VkFramebufferCreateInfo framebufferInfo = {0};
         framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebufferInfo.renderPass      = pipeline::renderPass;
         framebufferInfo.attachmentCount = 1;
@@ -306,7 +334,7 @@ void rvRecordCommandBuffer
     VkCommandBuffer commandBuffer,
     u32             imageIndex
 ){
-    VkCommandBufferBeginInfo beginInfo{};
+    VkCommandBufferBeginInfo beginInfo = {0};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
     if((vkBeginCommandBuffer(commandBuffer, &beginInfo)) != VK_SUCCESS)
@@ -316,7 +344,7 @@ void rvRecordCommandBuffer
 
     VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
 
-    VkRenderPassBeginInfo renderPassInfo{};
+    VkRenderPassBeginInfo renderPassInfo = {0};
     renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass        = pipeline::renderPass;
     renderPassInfo.framebuffer       = swapChainFramebuffers[imageIndex];
@@ -363,22 +391,23 @@ void rvCreateSyncObjects
     VkSemaphoreCreateInfo semaphoreInfo = {0};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VkFenceCreateInfo fenceInfo{};
+    VkFenceCreateInfo fenceInfo = {0};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     if((vkCreateSemaphore(logicalDevice, &semaphoreInfo, 0, &imageAvailableSemaphore)) != VK_SUCCESS ||
-       (vkCreateSemaphore(logicalDevice, &semaphoreInfo, 0, &renderFinishedSemaphore)) != VK_SUCCESS)
-    {
-        RV_ERROR("\nERROR: failed to create semaphores!");
+       (vkCreateSemaphore(logicalDevice, &semaphoreInfo, 0, &renderFinishedSemaphore)) != VK_SUCCESS
+    ){
+        RV_ERROR("failed to create semaphores!");
     }
     else
     {
         RV_DEBUG("Successfully created semaphores.", 0, 1);
     }
 
-    if((vkCreateFence(device::logicalDevice, &fenceInfo, 0, &pipeline::inFlightFence)) != VK_SUCCESS)
-    {
+    if((vkCreateFence(engine->vkData->logicalDevice, &fenceInfo, 0,
+                      &engine->vkData->inFlightFence)) != VK_SUCCESS
+    ){
         RV_ERROR("failed to create fence!");
     }
     else
